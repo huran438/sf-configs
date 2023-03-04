@@ -15,7 +15,7 @@ namespace SFramework.Repositories.Editor
                 {
                     if (!SFRepositorySettings.Instance(out var settings)) return;
                     var settingsSO = new SerializedObject(settings);
-                    EditorGUILayout.PropertyField(settingsSO.FindProperty("repositoriesPath"));
+                    EditorGUILayout.PropertyField(settingsSO.FindProperty("RepositoriesPath"));
                     settingsSO.ApplyModifiedPropertiesWithoutUndo();
                     AssetDatabase.SaveAssetIfDirty(settingsSO.targetObject);
                 },
