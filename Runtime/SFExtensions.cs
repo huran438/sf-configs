@@ -54,7 +54,7 @@ namespace SFramework.Repositories.Runtime
         {
             var paths = new List<string>();
 
-            path += node._Name;
+            path += node.Name;
 
             if (node.Nodes == null)
             {

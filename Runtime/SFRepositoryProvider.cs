@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -30,7 +29,7 @@ namespace SFramework.Repositories.Runtime
                 }
             }
         }
-        
+
         public IEnumerable<T> GetRepositories<T>() where T : ISFRepository
         {
             return repositoriesByType.TryGetValue(typeof(T), out var repo) ? repo.Cast<T>().ToList() : new List<T>();

@@ -4,8 +4,8 @@ namespace SFramework.Repositories.Runtime
 {
     public interface ISFNode
     {
-        [JsonIgnore]
-        public string _Name { get; }
+        [JsonProperty(Order = -30)]
+        public string Name { get; set; }
         
         [JsonIgnore]
         public ISFNode[] Nodes { get; }

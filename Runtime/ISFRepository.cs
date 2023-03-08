@@ -2,14 +2,12 @@ using Newtonsoft.Json;
 
 namespace SFramework.Repositories.Runtime
 {
-    public interface ISFRepository
+    public interface ISFRepository : ISFNode
     {
-        [JsonIgnore]
-        public string _Name { get; }
+        [JsonProperty(Order = -20)]
+        public int Version { get; set; }
         
-        public string Type { get; }
-        
-        [JsonIgnore]
-        public ISFNode[] Nodes { get; }
+        [JsonProperty(Order = -50)]
+        public string Type { get; set; }
     }
 }

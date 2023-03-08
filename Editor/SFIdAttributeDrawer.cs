@@ -57,7 +57,7 @@ namespace SFramework.Repositories.Editor
 
                 foreach (var id in ids)
                 {
-                    paths.Add($"{repository._Name}/{id}");
+                    paths.Add($"{repository.Name}/{id}");
                 }
             }
             
