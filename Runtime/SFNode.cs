@@ -1,9 +1,11 @@
 using System;
 using Newtonsoft.Json;
 using UnityEngine;
+using UnityEngine.Scripting;
 
 namespace SFramework.Repositories.Runtime
 {
+    [Preserve]
     [Serializable]
     public abstract class SFNode : ISFNode
     {

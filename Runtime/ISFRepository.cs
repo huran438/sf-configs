@@ -1,7 +1,9 @@
 using Newtonsoft.Json;
+using UnityEngine.Scripting;
 
 namespace SFramework.Repositories.Runtime
 {
+    [Preserve]
     public interface ISFRepository : ISFNode
     {
         [JsonProperty(Order = -20)]
