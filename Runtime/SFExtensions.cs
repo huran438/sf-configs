@@ -5,6 +5,11 @@ namespace SFramework.Repositories.Runtime
 {
     public static partial class SFExtensions
     {
+        public static string GetSFId(params string[] names)
+        {
+            return string.Join('/', names);
+        }
+
         public static void FindAllPaths(this ISFNode[] nodes, out List<string> paths, int targetLayer = -1)
         {
             var ids = new HashSet<string>();
