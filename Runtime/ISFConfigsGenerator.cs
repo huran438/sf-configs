@@ -1,8 +1,8 @@
 using SFramework.Core.Runtime;
 
-namespace SFramework.Repositories.Runtime
+namespace SFramework.Configs.Runtime
 {
-    public interface ISFRepositoryGenerator
+    public interface ISFConfigsGenerator
     {
         void GetGenerationData(out SFGenerationData[] generationData);
     }

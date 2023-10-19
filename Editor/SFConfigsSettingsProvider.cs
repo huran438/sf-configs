@@ -1,26 +1,26 @@
 ﻿using System.Collections.Generic;
-using SFramework.Repositories.Runtime;
+using SFramework.Configs.Runtime;
 using UnityEditor;
 
-namespace SFramework.Repositories.Editor
+namespace SFramework.Configs.Editor
 {
-    public static class SFRepositorySettingsProvider
+    public static class SFConfigsSettingsProvider
     {
         [SettingsProvider]
         public static SettingsProvider Create()
         {
-            var provider = new SettingsProvider("Project/SFramework/Repository", SettingsScope.Project)
+            var provider = new SettingsProvider("Project/SFramework/Configs", SettingsScope.Project)
             {
                 guiHandler = (_) =>
                 {
-                    if (!SFRepositorySettings.Instance(out var settings)) return;
+                    if (!SFConfigsSettings.Instance(out var settings)) return;
                     var settingsSO = new SerializedObject(settings);
-                    EditorGUILayout.PropertyField(settingsSO.FindProperty("RepositoriesPath"));
+                    EditorGUILayout.PropertyField(settingsSO.FindProperty("ConfigsPath"));
                     settingsSO.ApplyModifiedPropertiesWithoutUndo();
                     AssetDatabase.SaveAssetIfDirty(settingsSO.targetObject);
                 },
 
-                keywords = new HashSet<string>(new[] { "SF", "Repository" })
+                keywords = new HashSet<string>(new[] { "SF", "Configs" })
             };
 
             return provider;

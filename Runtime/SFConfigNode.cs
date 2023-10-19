@@ -3,11 +3,11 @@ using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.Scripting;
 
-namespace SFramework.Repositories.Runtime
+namespace SFramework.Configs.Runtime
 {
     [Preserve]
     [Serializable]
-    public abstract class SFNode : ISFNode
+    public abstract class SFConfigNode : ISFConfigNode
     {
         [SerializeField, JsonIgnore]
         private string _name;
@@ -16,6 +16,6 @@ namespace SFramework.Repositories.Runtime
             get => _name;
             set => _name = value;
         }
-        public abstract ISFNode[] Nodes { get; }
+        public abstract ISFConfigNode[] Nodes { get; }
     }
 }

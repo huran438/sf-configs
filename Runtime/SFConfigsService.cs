@@ -5,13 +5,13 @@ using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using UnityEngine;
 
-namespace SFramework.Repositories.Runtime
+namespace SFramework.Configs.Runtime
 {
-    public class SFRepositoryProvider : ISFRepositoryProvider
+    public class SFConfigsService : ISFConfigsService
     {
         private Dictionary<Type, HashSet<object>> repositoriesByType = new();
-
-        public SFRepositoryProvider()
+        
+        SFConfigsService()
         {
             foreach (var type in GetInheritedClasses())
             {
@@ -21,7 +21,7 @@ namespace SFramework.Repositories.Runtime
                 {
                     var text = Regex.Replace(textAsset.text, "(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", "$1");
                     if (!text.StartsWith($"{{\"Type\":\"{type.Name}\"") && !text.EndsWith($"\"Type\":\"{type.Name}\"}}")) continue;
-                    var repository = JsonConvert.DeserializeObject(text, type) as ISFRepository;
+                    var repository = JsonConvert.DeserializeObject(text, type) as ISFConfig;
                     if (repository == null) continue;
                     if (!repositoriesByType.ContainsKey(type))
                         repositoriesByType[type] = new HashSet<object>();
@@ -30,7 +30,7 @@ namespace SFramework.Repositories.Runtime
             }
         }
 
-        public IEnumerable<T> GetRepositories<T>() where T : ISFRepository
+        public IEnumerable<T> GetRepositories<T>() where T : ISFConfig
         {
             return repositoriesByType.TryGetValue(typeof(T), out var repo) ? repo.Cast<T>().ToList() : new List<T>();
         }
@@ -39,8 +39,15 @@ namespace SFramework.Repositories.Runtime
         {
             return AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(a => a.GetTypes())
-                .Where(t => t.IsClass && typeof(ISFRepository).IsAssignableFrom(t))
+                .Where(t => t.IsClass && typeof(ISFConfig).IsAssignableFrom(t))
                 .ToArray();
         }
+
+        public void Dispose()
+        {
+            // TODO release managed resources here
+        }
+
+   
     }
 }

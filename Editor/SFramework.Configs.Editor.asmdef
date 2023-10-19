@@ -1,10 +1,14 @@
 {
-    "name": "SFramework.Repositories.Runtime",
-    "rootNamespace": "SFramework.Repositories.Runtime",
+    "name": "SFramework.Configs.Editor",
+    "rootNamespace": "SFramework.Configs.Editor",
     "references": [
-        "SFramework.Core.Runtime"
+        "SFramework.Configs.Runtime",
+        "SFramework.Core.Runtime",
+        "SFramework.Core.Editor"
     ],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,

@@ -1,15 +1,15 @@
 using Newtonsoft.Json;
 using UnityEngine.Scripting;
 
-namespace SFramework.Repositories.Runtime
+namespace SFramework.Configs.Runtime
 {
     [Preserve]
-    public interface ISFNode
+    public interface ISFConfigNode
     {
         [JsonProperty(Order = -30)]
         public string Name { get; set; }
         
         [JsonIgnore]
-        public ISFNode[] Nodes { get; }
+        public ISFConfigNode[] Nodes { get; }
     }
 }

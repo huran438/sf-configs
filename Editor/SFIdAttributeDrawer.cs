@@ -1,26 +1,26 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using SFramework.Repositories.Runtime;
+using SFramework.Configs.Runtime;
 using UnityEditor;
 using UnityEngine;
 
-namespace SFramework.Repositories.Editor
+namespace SFramework.Configs.Editor
 {
     [CustomPropertyDrawer(typeof(SFIdAttribute), true)]
     public class SFIdAttributeDrawer : PropertyDrawer
     {
-        private HashSet<ISFRepository> _repositories;
+        private HashSet<ISFConfig> _repositories;
 
         public SFIdAttributeDrawer()
         {
-            _repositories = new HashSet<ISFRepository>();
+            _repositories = new HashSet<ISFConfig>();
         }
 
         private bool CheckAndLoadDatabase(Type type)
         {
             if (_repositories.Count != 0) return true;
-            _repositories = SFEditorExtensions.FindRepositories(type);
+            _repositories = SFConfigsEditorExtensions.FindRepositories(type);
             return _repositories.Count != 0;
         }
 

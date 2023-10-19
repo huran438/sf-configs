@@ -1,10 +1,10 @@
 using Newtonsoft.Json;
 using UnityEngine.Scripting;
 
-namespace SFramework.Repositories.Runtime
+namespace SFramework.Configs.Runtime
 {
     [Preserve]
-    public interface ISFRepository : ISFNode
+    public interface ISFConfig : ISFConfigNode
     {
         [JsonProperty(Order = -20)]
         public int Version { get; set; }

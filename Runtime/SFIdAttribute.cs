@@ -2,7 +2,7 @@
 using UnityEngine;
 using UnityEngine.Scripting;
 
-namespace SFramework.Repositories.Runtime
+namespace SFramework.Configs.Runtime
 {
     [Preserve]
     [AttributeUsage(AttributeTargets.Field)]

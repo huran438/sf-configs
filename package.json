@@ -1,9 +1,9 @@
 {
   "author": "Secret Place Studio",
-  "name": "sp.sframework.repositories",
-  "displayName": "SF Repositories",
+  "name": "sp.sframework.configs",
+  "displayName": "SF Configs",
   "version": "0.1.0",
-  "description": "SF Buckets - module",
+  "description": "",
   "keywords": [
     "repositories",
     "sframework"

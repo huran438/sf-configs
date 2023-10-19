@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Linq;
+using SFramework.Configs.Runtime;
 using SFramework.Core.Editor;
-using SFramework.Repositories.Runtime;
 using UnityEditor;
-using UnityEngine;
 
-namespace SFramework.Repositories.Editor
+namespace SFramework.Configs.Editor
 {
     [Serializable]
-    public sealed class SFRepositoryGenerationTool : ISFEditorTool
+    public sealed class SFConfigsGenerationTool : ISFEditorTool
     {
         [MenuItem("Edit/SFramework/Generate Repositories Scripts")]
         private static void GenerateScripts()
@@ -19,8 +18,8 @@ namespace SFramework.Repositories.Editor
 
             foreach (var type in GetInheritedClasses())
             {
-                var repositories = SFEditorExtensions.FindRepositories(type);
-                foreach (ISFRepositoryGenerator repository in repositories)
+                var repositories = SFConfigsEditorExtensions.FindRepositories(type);
+                foreach (ISFConfigsGenerator repository in repositories)
                 {
                     if(repository == null) continue;
                     repository.GetGenerationData(out var generationData);
@@ -40,7 +39,7 @@ namespace SFramework.Repositories.Editor
         {
             return AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(a => a.GetTypes())
-                .Where(t => t.IsClass && typeof(ISFRepositoryGenerator).IsAssignableFrom(t))
+                .Where(t => t.IsClass && typeof(ISFConfigsGenerator).IsAssignableFrom(t))
                 .ToArray();
         }
 
