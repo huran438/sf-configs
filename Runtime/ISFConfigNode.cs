@@ -6,10 +6,18 @@ namespace SFramework.Configs.Runtime
     [Preserve]
     public interface ISFConfigNode
     {
+        void BuildTree();
+        
         [JsonProperty(Order = -30)]
-        public string Name { get; set; }
+        public string Id { get; set; }
         
         [JsonIgnore]
-        public ISFConfigNode[] Nodes { get; }
+        public string Path { get; set; }
+        
+        [JsonIgnore]
+        public ISFConfigNode Parent { get; set; }
+        
+        [JsonIgnore]
+        public ISFConfigNode[] Children { get; }
     }
 }

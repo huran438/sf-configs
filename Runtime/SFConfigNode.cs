@@ -2,6 +2,7 @@ using System;
 using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.Scripting;
+using UnityEngine.Serialization;
 
 namespace SFramework.Configs.Runtime
 {
@@ -9,13 +10,28 @@ namespace SFramework.Configs.Runtime
     [Serializable]
     public abstract class SFConfigNode : ISFConfigNode
     {
-        [SerializeField, JsonIgnore]
-        private string _name;
-        public string Name
+        public void BuildTree()
         {
-            get => _name;
-            set => _name = value;
+            if (Children == null) return;
+            foreach (var child in Children)
+            {
+                child.Path = $"{Parent.Id}/{Id}/{child.Id}";
+                child.Parent = this;
+                child.BuildTree();
+            }
         }
-        public abstract ISFConfigNode[] Nodes { get; }
+        
+        [FormerlySerializedAs("_name")]
+        [SerializeField, JsonIgnore]
+        private string _id;
+        
+        public string Id
+        {
+            get => _id;
+            set => _id = value;
+        }
+        public string Path { get; set; }
+        public ISFConfigNode Parent { get; set; }
+        public abstract ISFConfigNode[] Children { get; }
     }
 }

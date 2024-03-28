@@ -23,6 +23,7 @@ namespace SFramework.Configs.Runtime
                     if (!text.StartsWith($"{{\"Type\":\"{type.Name}\"") && !text.EndsWith($"\"Type\":\"{type.Name}\"}}")) continue;
                     var repository = JsonConvert.DeserializeObject(text, type) as ISFConfig;
                     if (repository == null) continue;
+                    repository.BuildTree();
                     if (!repositoriesByType.ContainsKey(type))
                         repositoriesByType[type] = new HashSet<object>();
                     repositoriesByType[type].Add(repository);

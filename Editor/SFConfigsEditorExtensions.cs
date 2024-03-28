@@ -120,21 +120,21 @@ namespace SFramework.Configs.Editor
         {
             var paths = new List<string>();
 
-            path += node.Name;
+            path += node.Id;
 
-            if (node.Nodes == null)
+            if (node.Children == null)
             {
                 paths.Add(path);
                 return paths;
             }
 
-            if (node.Nodes.Length == 0)
+            if (node.Children.Length == 0)
             {
                 paths.Add(path);
                 return paths;
             }
 
-            foreach (var child in node.Nodes)
+            foreach (var child in node.Children)
             {
                 var childPaths = GetChildPaths(child, path + "/");
                 if (childPaths == null) continue;
