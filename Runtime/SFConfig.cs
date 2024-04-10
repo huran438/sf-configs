@@ -12,7 +12,7 @@ namespace SFramework.Configs.Runtime
             if (Children == null) return;
             foreach (var child in Children)
             {
-                child.Path = Id;
+                child.Path = $"{Id}/{child.Id}";
                 child.Parent = this;
                 child.BuildTree();
             }
