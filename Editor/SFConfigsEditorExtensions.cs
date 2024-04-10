@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using JetBrains.Annotations;
 using Newtonsoft.Json;
 using SFramework.Configs.Runtime;
 using UnityEditor;
@@ -10,7 +11,7 @@ namespace SFramework.Configs.Editor
 {
     public static class SFConfigsEditorExtensions
     {
-        public static HashSet<ISFConfig> FindRepositories(Type type)
+        public static HashSet<ISFConfig> FindRepositories(Type type, [CanBeNull] JsonSerializerSettings jsonSerializerSettings = null)
         {
             var _repositories = new HashSet<ISFConfig>();
 
@@ -31,7 +32,7 @@ namespace SFramework.Configs.Editor
                 text = Regex.Replace(text, "(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", "$1");
                 if (text.StartsWith($"{{\"Type\":\"{type.Name}\"") || text.EndsWith($"\"Type\":\"{type.Name}\"}}"))
                 {
-                    var repository = JsonConvert.DeserializeObject(text, type) as ISFConfig;
+                    var repository = JsonConvert.DeserializeObject(text, type, jsonSerializerSettings) as ISFConfig;
                     if (repository == null) continue;
                     _repositories.Add(repository);
                 }
@@ -40,7 +41,7 @@ namespace SFramework.Configs.Editor
             return _repositories;
         }
 
-        public static Dictionary<ISFConfig, string> FindRepositoriesWithPaths(Type type)
+        public static Dictionary<ISFConfig, string> FindRepositoriesWithPaths(Type type, [CanBeNull] JsonSerializerSettings jsonSerializerSettings = null)
         {
             var _repositories = new Dictionary<ISFConfig, string>();
 
@@ -61,7 +62,7 @@ namespace SFramework.Configs.Editor
                 text = Regex.Replace(text, "(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", "$1");
                 if (text.StartsWith($"{{\"Type\":\"{type.Name}\"") || text.EndsWith($"\"Type\":\"{type.Name}\"}}"))
                 {
-                    var repository = JsonConvert.DeserializeObject(text, type) as ISFConfig;
+                    var repository = JsonConvert.DeserializeObject(text, type, jsonSerializerSettings) as ISFConfig;
                     if (repository == null) continue;
                     _repositories[repository] = path;
                 }
