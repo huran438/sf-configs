@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using SFramework.Configs.Runtime;
 using UnityEditor;
 using UnityEngine;
@@ -11,13 +12,40 @@ namespace SFramework.Configs.Editor
 {
     public static class SFConfigsEditorExtensions
     {
+        public static void RegenerateConfigs(bool indented)
+        {
+            if (!SFConfigsSettings.Instance(out var settings)) return;
+
+            var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
+            {
+                settings.ConfigsPath
+            });
+
+            if (assetsGuids == null || assetsGuids.Length == 0)
+            {
+                Debug.LogWarning("No Configs Found");
+                return;
+            }
+
+            foreach (var assetsGuid in assetsGuids)
+            {
+                var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
+                var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
+                var repository = JObject.Parse(text);
+                System.IO.File.WriteAllText(path, repository.ToString(indented ? Formatting.Indented : Formatting.None));
+            }
+        }
+        
         public static HashSet<ISFConfig> FindRepositories(Type type, [CanBeNull] JsonSerializerSettings jsonSerializerSettings = null)
         {
             var _repositories = new HashSet<ISFConfig>();
 
             if (!SFConfigsSettings.Instance(out var settings)) return _repositories;
 
-            var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[] { settings.ConfigsPath });
+            var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
+            {
+                settings.ConfigsPath
+            });
 
             if (assetsGuids == null || assetsGuids.Length == 0)
             {
@@ -47,7 +75,10 @@ namespace SFramework.Configs.Editor
 
             if (!SFConfigsSettings.Instance(out var settings)) return _repositories;
 
-            var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[] { settings.ConfigsPath });
+            var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
+            {
+                settings.ConfigsPath
+            });
 
             if (assetsGuids == null || assetsGuids.Length == 0)
             {

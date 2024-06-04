@@ -9,7 +9,7 @@ namespace SFramework.Configs.Runtime
 {
     public class SFConfigsService : ISFConfigsService
     {
-        private Dictionary<Type, HashSet<object>> repositoriesByType = new();
+        private readonly Dictionary<Type, HashSet<object>> _repositoriesByType = new();
         
         SFConfigsService()
         {
@@ -24,16 +24,16 @@ namespace SFramework.Configs.Runtime
                     var repository = JsonConvert.DeserializeObject(text, type) as ISFConfig;
                     if (repository == null) continue;
                     repository.BuildTree();
-                    if (!repositoriesByType.ContainsKey(type))
-                        repositoriesByType[type] = new HashSet<object>();
-                    repositoriesByType[type].Add(repository);
+                    if (!_repositoriesByType.ContainsKey(type))
+                        _repositoriesByType[type] = new HashSet<object>();
+                    _repositoriesByType[type].Add(repository);
                 }
             }
         }
 
         public IEnumerable<T> GetRepositories<T>() where T : ISFConfig
         {
-            return repositoriesByType.TryGetValue(typeof(T), out var repo) ? repo.Cast<T>().ToList() : new List<T>();
+            return _repositoriesByType.TryGetValue(typeof(T), out var repo) ? repo.Cast<T>().ToList() : new List<T>();
         }
 
         private static Type[] GetInheritedClasses()
@@ -46,7 +46,7 @@ namespace SFramework.Configs.Runtime
 
         public void Dispose()
         {
-            // TODO release managed resources here
+            _repositoriesByType.Clear();
         }
 
    
