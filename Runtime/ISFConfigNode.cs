@@ -12,7 +12,7 @@ namespace SFramework.Configs.Runtime
         public string Id { get; set; }
         
         [JsonIgnore]
-        public string Path { get; set; }
+        public string FullId { get; set; }
         
         [JsonIgnore]
         public ISFConfigNode Parent { get; set; }

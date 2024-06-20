@@ -2,7 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
+using SFramework.Core.Runtime;
 using UnityEngine;
 
 namespace SFramework.Configs.Runtime
@@ -11,7 +14,7 @@ namespace SFramework.Configs.Runtime
     {
         private readonly Dictionary<Type, HashSet<object>> _repositoriesByType = new();
         
-        SFConfigsService()
+        public UniTask Init(CancellationToken cancellationToken)
         {
             foreach (var type in GetInheritedClasses())
             {
@@ -29,9 +32,11 @@ namespace SFramework.Configs.Runtime
                     _repositoriesByType[type].Add(repository);
                 }
             }
+            
+            return UniTask.CompletedTask;
         }
 
-        public IEnumerable<T> GetRepositories<T>() where T : ISFConfig
+        public IEnumerable<T> GetConfigs<T>() where T : ISFConfig
         {
             return _repositoriesByType.TryGetValue(typeof(T), out var repo) ? repo.Cast<T>().ToList() : new List<T>();
         }
@@ -49,6 +54,7 @@ namespace SFramework.Configs.Runtime
             _repositoriesByType.Clear();
         }
 
-   
+
+
     }
 }

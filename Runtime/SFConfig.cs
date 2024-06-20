@@ -12,7 +12,7 @@ namespace SFramework.Configs.Runtime
             if (Children == null) return;
             foreach (var child in Children)
             {
-                child.Path = $"{Id}/{child.Id}";
+                child.FullId = $"{Id}/{child.Id}";
                 child.Parent = this;
                 child.BuildTree();
             }
@@ -20,7 +20,7 @@ namespace SFramework.Configs.Runtime
         public string Type { get; set; }
         public int Version { get; set; }
         public string Id { get; set; }
-        public string Path { get; set; }
+        public string FullId { get; set; }
         public ISFConfigNode Parent { get; set; }
         public abstract ISFConfigNode[] Children { get; }
     }
