@@ -13,9 +13,15 @@ namespace SFramework.Configs.Runtime
         public void BuildTree()
         {
             if (Children == null) return;
+
+            if (Parent == null)
+            {
+                FullId = Id;
+            }
             foreach (var child in Children)
             {
-                child.FullId = $"{Parent.Id}/{Id}/{child.Id}";
+                var fullId = Parent == null ? $"{Id}/{child.Id}" : $"{Parent.Id}/{Id}/{child.Id}";
+                child.FullId = fullId;
                 child.Parent = this;
                 child.BuildTree();
             }
