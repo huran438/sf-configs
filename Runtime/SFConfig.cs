@@ -9,6 +9,7 @@ namespace SFramework.Configs.Runtime
     {
         public void BuildTree()
         {
+            FullId = Id;
             if (Children == null) return;
             foreach (var child in Children)
             {
