@@ -55,9 +55,16 @@ namespace SFramework.Configs.Editor
             {
                 repository.Children.FindAllPaths(out var ids, sfTypeAttribute.Indent);
 
-                foreach (var id in ids)
+                if (sfTypeAttribute.Indent == 0)
                 {
-                    paths.Add($"{repository.Id}/{id}");
+                    paths.Add(repository.Id);
+                }
+                else
+                {
+                    foreach (var id in ids)
+                    {
+                        paths.Add(string.Join("/", repository.Id, id));
+                    }
                 }
             }
             
