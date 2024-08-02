@@ -13,7 +13,7 @@ namespace SFramework.Configs.Runtime
     public class SFConfigsService : ISFConfigsService
     {
         private readonly Dictionary<Type, HashSet<object>> _repositoriesByType = new();
-        
+
         public UniTask Init(CancellationToken cancellationToken)
         {
             foreach (var type in GetInheritedClasses())
@@ -24,15 +24,20 @@ namespace SFramework.Configs.Runtime
                 {
                     var text = Regex.Replace(textAsset.text, "(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", "$1");
                     if (!text.StartsWith($"{{\"Type\":\"{type.Name}\"") && !text.EndsWith($"\"Type\":\"{type.Name}\"}}")) continue;
-                    var repository = JsonConvert.DeserializeObject(text, type) as ISFConfig;
-                    if (repository == null) continue;
-                    repository.BuildTree();
+                    var config = JsonConvert.DeserializeObject(text, type) as ISFConfig;
+                    if (config == null) continue;
+
+                    if (config is ISFNodesConfig nodesConfig)
+                    {
+                        nodesConfig.BuildTree();
+                    }
+
                     if (!_repositoriesByType.ContainsKey(type))
                         _repositoriesByType[type] = new HashSet<object>();
-                    _repositoriesByType[type].Add(repository);
+                    _repositoriesByType[type].Add(config);
                 }
             }
-            
+
             return UniTask.CompletedTask;
         }
 

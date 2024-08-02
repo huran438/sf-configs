@@ -2,13 +2,12 @@ using System;
 using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.Scripting;
-using UnityEngine.Serialization;
 
 namespace SFramework.Configs.Runtime
 {
     [Preserve]
     [Serializable]
-    public abstract class SFConfig : ISFConfig
+    public abstract class SFNodesConfig : ISFNodesConfig
     {
         public void BuildTree()
         {

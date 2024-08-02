@@ -5,6 +5,7 @@ using JetBrains.Annotations;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SFramework.Configs.Runtime;
+using SFramework.Core.Runtime;
 using UnityEditor;
 using UnityEngine;
 
@@ -35,10 +36,10 @@ namespace SFramework.Configs.Editor
                 System.IO.File.WriteAllText(path, repository.ToString(indented ? Formatting.Indented : Formatting.None));
             }
         }
-        
-        public static HashSet<ISFConfig> FindRepositories(Type type, [CanBeNull] JsonSerializerSettings jsonSerializerSettings = null)
+
+        public static HashSet<T> FindConfigs<T>(Type type, [CanBeNull] JsonSerializerSettings jsonSerializerSettings = null) where T : ISFConfig
         {
-            var _repositories = new HashSet<ISFConfig>();
+            var _repositories = new HashSet<T>();
 
             if (!SFConfigsSettings.Instance(out var settings)) return _repositories;
 
@@ -49,7 +50,7 @@ namespace SFramework.Configs.Editor
 
             if (assetsGuids == null || assetsGuids.Length == 0)
             {
-                Debug.LogWarning($"Missing Repository: {type.Name}");
+                SFDebug.Log(LogType.Warning, "Missing Repository: {0}", type.Name);
                 return _repositories;
             }
 
@@ -60,7 +61,7 @@ namespace SFramework.Configs.Editor
                 text = Regex.Replace(text, "(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", "$1");
                 if (text.StartsWith($"{{\"Type\":\"{type.Name}\"") || text.EndsWith($"\"Type\":\"{type.Name}\"}}"))
                 {
-                    var repository = JsonConvert.DeserializeObject(text, type, jsonSerializerSettings) as ISFConfig;
+                    var repository =  (T)JsonConvert.DeserializeObject(text, type,jsonSerializerSettings);
                     if (repository == null) continue;
                     _repositories.Add(repository);
                 }
@@ -71,9 +72,9 @@ namespace SFramework.Configs.Editor
 
         public static Dictionary<ISFConfig, string> FindRepositoriesWithPaths(Type type, [CanBeNull] JsonSerializerSettings jsonSerializerSettings = null)
         {
-            var _repositories = new Dictionary<ISFConfig, string>();
+            var configs = new Dictionary<ISFConfig, string>();
 
-            if (!SFConfigsSettings.Instance(out var settings)) return _repositories;
+            if (!SFConfigsSettings.Instance(out var settings)) return configs;
 
             var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
             {
@@ -82,8 +83,8 @@ namespace SFramework.Configs.Editor
 
             if (assetsGuids == null || assetsGuids.Length == 0)
             {
-                Debug.LogWarning($"Missing Repository: {type.Name}");
-                return _repositories;
+                SFDebug.Log(LogType.Warning, "Missing Repository: {0}", type.Name);
+                return configs;
             }
 
             foreach (var assetsGuid in assetsGuids)
@@ -95,11 +96,11 @@ namespace SFramework.Configs.Editor
                 {
                     var repository = JsonConvert.DeserializeObject(text, type, jsonSerializerSettings) as ISFConfig;
                     if (repository == null) continue;
-                    _repositories[repository] = path;
+                    configs[repository] = path;
                 }
             }
 
-            return _repositories;
+            return configs;
         }
 
 

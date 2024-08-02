@@ -10,18 +10,18 @@ namespace SFramework.Configs.Editor
     [CustomPropertyDrawer(typeof(SFIdAttribute), true)]
     public class SFIdAttributeDrawer : PropertyDrawer
     {
-        private HashSet<ISFConfig> _repositories;
+        private HashSet<ISFNodesConfig> _configs;
 
         public SFIdAttributeDrawer()
         {
-            _repositories = new HashSet<ISFConfig>();
+            _configs = new HashSet<ISFNodesConfig>();
         }
 
         private bool CheckAndLoadDatabase(Type type)
         {
-            if (_repositories.Count != 0) return true;
-            _repositories = SFConfigsEditorExtensions.FindRepositories(type);
-            return _repositories.Count != 0;
+            if (_configs.Count != 0) return true;
+            _configs = SFConfigsEditorExtensions.FindConfigs<ISFNodesConfig>(type);
+            return _configs.Count != 0;
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
@@ -51,7 +51,7 @@ namespace SFramework.Configs.Editor
 
             var paths = new List<string> { "-" };
 
-            foreach (var repository in _repositories)
+            foreach (var repository in _configs)
             {
                 repository.Children.FindAllPaths(out var ids, sfTypeAttribute.Indent);
 
