@@ -6,14 +6,21 @@ using JetBrains.Annotations;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SFramework.Configs.Runtime;
+using SFramework.Core.Runtime;
 using UnityEditor;
 using UnityEditor.Callbacks;
 using UnityEngine;
 
 namespace SFramework.Configs.Editor
 {
+    [InitializeOnLoad]
     public static class SFConfigsEditorExtensions
     {
+        static SFConfigsEditorExtensions()
+        {
+            ReloadCache();
+            SFDebug.Log("Initialize SFConfigs Cache");
+        }
         public static void RegenerateConfigs(bool indented)
         {
             if (!SFConfigsSettings.Instance(out var settings)) return;
