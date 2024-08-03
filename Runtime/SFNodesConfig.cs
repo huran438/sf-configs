@@ -29,8 +29,14 @@ namespace SFramework.Configs.Runtime
 
         public string Id
         {
-            get => _id;
-            set => _id = value;
+            get
+            {
+                return _id;
+            }
+            set
+            {
+                _id = value;
+            }
         }
 
         public string FullId { get; set; }

@@ -13,6 +13,7 @@ namespace SFramework.Configs.Runtime
     public class SFConfigsService : ISFConfigsService
     {
         private readonly Dictionary<Type, HashSet<object>> _repositoriesByType = new();
+        private readonly HashSet<ISFConfig> _configs = new HashSet<ISFConfig>();
 
         public UniTask Init(CancellationToken cancellationToken)
         {
@@ -35,18 +36,14 @@ namespace SFramework.Configs.Runtime
                     if (!_repositoriesByType.ContainsKey(type))
                         _repositoriesByType[type] = new HashSet<object>();
                     _repositoriesByType[type].Add(config);
+                    _configs.Add(config);
                 }
             }
 
             return UniTask.CompletedTask;
         }
 
-        public IEnumerable<T> GetConfigs<T>() where T : ISFConfig
-        {
-            return _repositoriesByType.TryGetValue(typeof(T), out var repo) ? repo.Cast<T>().ToList() : new List<T>();
-        }
-
-        private static Type[] GetInheritedClasses()
+        private Type[] GetInheritedClasses()
         {
             return AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(a => a.GetTypes())
@@ -58,8 +55,53 @@ namespace SFramework.Configs.Runtime
         {
             _repositoriesByType.Clear();
         }
+        
+        public IEnumerable<ISFConfig> Configs => _configs;
+        
+        
+        public IEnumerable<T> GetConfigs<T>() where T : ISFConfig
+        {
+            return Configs.Cast<T>();
+        }
+        
+        public bool TryGetConfigs<T>(out IEnumerable<T> configs) where T : ISFConfig
+        {
+            if (_repositoriesByType.TryGetValue(typeof(T), out var repo))
+            {
+                configs = repo.Cast<T>();
+                return true;
+            }
 
+            configs = Array.Empty<T>();
+            return false;
+        }
+        public bool TryGetNodesConfig<T>(out IEnumerable<T> configs) where T : ISFNodesConfig
+        {
+            if (_repositoriesByType.TryGetValue(typeof(T), out var repo))
+            {
+                configs = repo.Cast<T>();
+                return true;
+            }
 
+            configs = Array.Empty<T>();
+            return false;
+        }
+        public bool TryGetGlobalConfig<T>(out T config) where T : ISFGlobalConfig
+        {
+            if (_repositoriesByType.TryGetValue(typeof(T), out var repo))
+            {
+                if (repo.Count > 0)
+                {
+                    config = (T) repo.FirstOrDefault();
+                    return true;
+                }
 
+                config = Activator.CreateInstance<T>();
+                return false;
+            }
+
+            config = Activator.CreateInstance<T>();
+            return false;
+        }
     }
 }

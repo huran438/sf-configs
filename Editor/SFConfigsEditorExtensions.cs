@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SFramework.Configs.Runtime;
-using SFramework.Core.Runtime;
 using UnityEditor;
+using UnityEditor.Callbacks;
 using UnityEngine;
 
 namespace SFramework.Configs.Editor
@@ -37,42 +38,45 @@ namespace SFramework.Configs.Editor
             }
         }
 
-        public static HashSet<T> FindConfigs<T>(Type type, [CanBeNull] JsonSerializerSettings jsonSerializerSettings = null) where T : ISFConfig
+        private static Dictionary<Type, HashSet<ISFConfig>> _configsCache = new();
+
+        private static List<Type> GetTypesImplementingInterface<TInterface>()
         {
-            var _repositories = new HashSet<T>();
+            var interfaceType = typeof(TInterface);
+            var typesImplementingInterface = new List<Type>();
 
-            if (!SFConfigsSettings.Instance(out var settings)) return _repositories;
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
 
-            var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
+            foreach (var assembly in assemblies)
             {
-                settings.ConfigsPath
-            });
-
-            if (assetsGuids == null || assetsGuids.Length == 0)
-            {
-                SFDebug.Log(LogType.Warning, "Missing Repository: {0}", type.Name);
-                return _repositories;
+                var types = assembly.GetTypes().Where(t => interfaceType.IsAssignableFrom(t) && t.IsClass && !t.IsAbstract);
+                typesImplementingInterface.AddRange(types);
             }
 
-            foreach (var assetsGuid in assetsGuids)
-            {
-                var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
-                var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
-                text = Regex.Replace(text, "(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", "$1");
-                if (text.StartsWith($"{{\"Type\":\"{type.Name}\"") || text.EndsWith($"\"Type\":\"{type.Name}\"}}"))
-                {
-                    var repository =  (T)JsonConvert.DeserializeObject(text, type,jsonSerializerSettings);
-                    if (repository == null) continue;
-                    _repositories.Add(repository);
-                }
-            }
-
-            return _repositories;
+            return typesImplementingInterface;
         }
 
-        public static Dictionary<ISFConfig, string> FindRepositoriesWithPaths(Type type, [CanBeNull] JsonSerializerSettings jsonSerializerSettings = null)
+        [DidReloadScripts]
+        [MenuItem("Tools/Reload Configs", false, -9999)]
+        public static void ReloadCache()
         {
-            var configs = new Dictionary<ISFConfig, string>();
+            _configsCache.Clear();
+            var types = GetTypesImplementingInterface<ISFConfig>();
+
+            foreach (var type in types)
+            {
+                _configsCache[type] = FindConfigs(type);
+            }
+        }
+
+        public static HashSet<ISFConfig> FindConfigsCached(Type type)
+        {
+            return _configsCache.TryGetValue(type, out var result) ? result : new HashSet<ISFConfig>();
+        }
+
+        private static HashSet<ISFConfig> FindConfigs(Type type, [CanBeNull] JsonSerializerSettings jsonSerializerSettings = null)
+        {
+            var configs = new HashSet<ISFConfig>();
 
             if (!SFConfigsSettings.Instance(out var settings)) return configs;
 
@@ -83,7 +87,7 @@ namespace SFramework.Configs.Editor
 
             if (assetsGuids == null || assetsGuids.Length == 0)
             {
-                SFDebug.Log(LogType.Warning, "Missing Repository: {0}", type.Name);
+                Debug.LogWarning($"Missing Config: {type.Name}");
                 return configs;
             }
 
@@ -92,86 +96,104 @@ namespace SFramework.Configs.Editor
                 var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
                 var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
                 text = Regex.Replace(text, "(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", "$1");
-                if (text.StartsWith($"{{\"Type\":\"{type.Name}\"") || text.EndsWith($"\"Type\":\"{type.Name}\"}}"))
+                if (!text.Contains($"\"Type\":\"{type.Name}\"")) continue;
+                if (JsonConvert.DeserializeObject(text, type, jsonSerializerSettings) is ISFConfig config)
                 {
-                    var repository = JsonConvert.DeserializeObject(text, type, jsonSerializerSettings) as ISFConfig;
-                    if (repository == null) continue;
-                    configs[repository] = path;
+                    configs.Add(config);
                 }
             }
 
             return configs;
         }
 
+        public static Dictionary<ISFConfig, string> FindConfigsWithPaths(Type type, [CanBeNull] JsonSerializerSettings jsonSerializerSettings = null)
+        {
+            var repositories = new Dictionary<ISFConfig, string>();
+
+            if (!SFConfigsSettings.Instance(out var settings)) return repositories;
+
+            var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
+            {
+                settings.ConfigsPath
+            });
+
+            if (assetsGuids == null || assetsGuids.Length == 0)
+            {
+                Debug.LogWarning($"Missing Config: {type.Name}");
+                return repositories;
+            }
+
+            foreach (var assetsGuid in assetsGuids)
+            {
+                var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
+                var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
+                text = Regex.Replace(text, "(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", "$1");
+                if (!text.Contains($"\"Type\":\"{type.Name}\"")) continue;
+                if (JsonConvert.DeserializeObject(text, type, jsonSerializerSettings) is ISFConfig config)
+                {
+                    repositories[config] = path;
+                }
+            }
+
+            return repositories;
+        }
+
+        private static HashSet<string> _ids = new();
 
         public static void FindAllPaths(this ISFConfigNode[] nodes, out List<string> paths, int targetLayer = -1)
         {
-            var ids = new HashSet<string>();
+            _ids.Clear();
             paths = new List<string>();
 
             foreach (var root in nodes)
             {
                 var childPaths = GetChildPaths(root, "");
-
-                if (childPaths == null) continue;
-
-                foreach (var path in childPaths)
+                if (childPaths != null)
                 {
-                    ids.Add(path);
+                    _ids.UnionWith(childPaths);
                 }
             }
 
-
-            foreach (var id in ids)
+            foreach (var id in _ids)
             {
-                var split = id.Split("/");
+                var split = id.Split('/');
                 var path = string.Empty;
                 var childLevel = split.Length;
 
-                if (targetLayer > -1)
+                if (targetLayer > -1 && childLevel >= targetLayer)
                 {
-                    if (childLevel < targetLayer) continue;
                     childLevel = Mathf.Clamp(childLevel, 0, targetLayer);
                 }
 
                 for (var i = 0; i < childLevel; i++)
                 {
+                    if (i > 0) path += "/";
                     path += split[i];
-                    if (i < childLevel - 1)
-                    {
-                        path += "/";
-                    }
                 }
 
-                if (string.IsNullOrWhiteSpace(path)) continue;
-
-                paths.Add(path);
+                if (!string.IsNullOrWhiteSpace(path))
+                {
+                    paths.Add(path);
+                }
             }
         }
 
         private static List<string> GetChildPaths(ISFConfigNode node, string path)
         {
-            var paths = new List<string>();
-
-            path += node.Id;
-
-            if (node.Children == null)
+            var paths = new List<string>
             {
-                paths.Add(path);
-                return paths;
-            }
+                path + node.Id
+            };
 
-            if (node.Children.Length == 0)
-            {
-                paths.Add(path);
-                return paths;
-            }
+            if (node.Children == null || node.Children.Length == 0) return paths;
 
             foreach (var child in node.Children)
             {
-                var childPaths = GetChildPaths(child, path + "/");
-                if (childPaths == null) continue;
-                paths.AddRange(childPaths);
+                var childPaths = GetChildPaths(child, path + node.Id + "/");
+                if (childPaths != null)
+                {
+                    paths.AddRange(childPaths);
+                }
             }
 
             return paths;

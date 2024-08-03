@@ -10,18 +10,23 @@ namespace SFramework.Configs.Editor
     [CustomPropertyDrawer(typeof(SFIdAttribute), true)]
     public class SFIdAttributeDrawer : PropertyDrawer
     {
-        private HashSet<ISFNodesConfig> _configs;
-
-        public SFIdAttributeDrawer()
-        {
-            _configs = new HashSet<ISFNodesConfig>();
-        }
+        private readonly HashSet<ISFNodesConfig> _repositories = new HashSet<ISFNodesConfig>();
+        private readonly List<string> _paths = new List<string>();
+        private bool _canDraw;
 
         private bool CheckAndLoadDatabase(Type type)
         {
-            if (_configs.Count != 0) return true;
-            _configs = SFConfigsEditorExtensions.FindConfigs<ISFNodesConfig>(type);
-            return _configs.Count != 0;
+            if (_repositories.Count != 0) return true;
+
+            foreach (var config in SFConfigsEditorExtensions.FindConfigsCached(type))
+            {
+                if (config is ISFNodesConfig nodesConfig)
+                {
+                    _repositories.Add(nodesConfig);
+                }
+            }
+
+            return _repositories.Count != 0;
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
@@ -36,6 +41,14 @@ namespace SFramework.Configs.Editor
 
             var sfTypeAttribute = attribute as SFIdAttribute;
 
+            if (sfTypeAttribute == null)
+            {
+                GUI.backgroundColor = Color.red;
+                EditorGUI.LabelField(position, "Attribute is null!");
+                GUI.backgroundColor = Color.white;
+                return;
+            }
+
             if (!CheckAndLoadDatabase(sfTypeAttribute.Type)) return;
 
             EditorGUI.BeginProperty(position, label, property);
@@ -43,32 +56,32 @@ namespace SFramework.Configs.Editor
             var indent = EditorGUI.indentLevel;
             EditorGUI.indentLevel = 0;
 
-
             if (string.IsNullOrWhiteSpace(property.stringValue))
             {
                 property.stringValue = string.Empty;
             }
+            
+            _paths.Clear();
+            _paths.Add("-");
 
-            var paths = new List<string> { "-" };
-
-            foreach (var repository in _configs)
+            foreach (var repository in _repositories)
             {
                 repository.Children.FindAllPaths(out var ids, sfTypeAttribute.Indent);
 
                 if (sfTypeAttribute.Indent == 0)
                 {
-                    paths.Add(repository.Id);
+                    _paths.Add(repository.Id);
                 }
                 else
                 {
                     foreach (var id in ids)
                     {
-                        paths.Add(string.Join("/", repository.Id, id));
+                        _paths.Add(string.Join("/", repository.Id, id));
                     }
                 }
             }
-            
-            if (!string.IsNullOrWhiteSpace(property.stringValue) && !paths.Contains(property.stringValue))
+
+            if (!string.IsNullOrWhiteSpace(property.stringValue) && !_paths.Contains(property.stringValue))
             {
                 GUI.backgroundColor = Color.red;
                 property.stringValue = EditorGUI.TextField(position, property.stringValue);
@@ -76,26 +89,26 @@ namespace SFramework.Configs.Editor
             }
             else
             {
-                var name = paths.Contains(property.stringValue)
+                var name = _paths.Contains(property.stringValue)
                     ? property.stringValue
-                    : paths[0];
+                    : _paths[0];
 
-                var _index = paths.IndexOf(name);
+                var index = _paths.IndexOf(name);
 
                 EditorGUI.BeginChangeCheck();
 
-                if (_index == 0)
+                if (index == 0)
                 {
                     GUI.backgroundColor = Color.red;
                 }
 
-                _index = EditorGUI.Popup(position, _index, paths.ToArray());
+                index = EditorGUI.Popup(position, index, _paths.ToArray());
 
                 GUI.backgroundColor = Color.white;
 
                 if (EditorGUI.EndChangeCheck())
                 {
-                    property.stringValue = _index == 0 ? string.Empty : paths.ElementAt(_index);
+                    property.stringValue = index == 0 ? string.Empty : _paths.ElementAt(index);
                 }
             }
 

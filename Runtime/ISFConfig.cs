@@ -6,10 +6,10 @@ namespace SFramework.Configs.Runtime
     [Preserve]
     public interface ISFConfig
     {
-        [JsonProperty(Order = -20)]
-        public int Version { get; set; }
-        
-        [JsonProperty(Order = -50)]
+        [JsonProperty(Order = -438)]
         public string Type { get; set; }
+        
+        [JsonProperty(Order = -437)]
+        public int Version { get; set; }
     }
 }
