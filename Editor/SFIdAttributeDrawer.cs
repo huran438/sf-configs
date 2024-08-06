@@ -10,23 +10,20 @@ namespace SFramework.Configs.Editor
     [CustomPropertyDrawer(typeof(SFIdAttribute), true)]
     public class SFIdAttributeDrawer : PropertyDrawer
     {
-        private readonly HashSet<ISFNodesConfig> _repositories = new HashSet<ISFNodesConfig>();
+        private readonly HashSet<ISFNodesConfig> _configs = new HashSet<ISFNodesConfig>();
         private readonly List<string> _paths = new List<string>();
         private bool _canDraw;
 
         private bool CheckAndLoadDatabase(Type type)
         {
-            if (_repositories.Count != 0) return true;
+            if (_configs.Count != 0) return true;
 
-            foreach (var config in SFConfigsEditorExtensions.FindConfigsCached(type))
+            foreach (var config in SFConfigsEditorExtensions.FindConfigs<ISFNodesConfig>(type))
             {
-                if (config is ISFNodesConfig nodesConfig)
-                {
-                    _repositories.Add(nodesConfig);
-                }
+                _configs.Add(config);
             }
 
-            return _repositories.Count != 0;
+            return _configs.Count != 0;
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
@@ -64,19 +61,19 @@ namespace SFramework.Configs.Editor
             _paths.Clear();
             _paths.Add("-");
 
-            foreach (var repository in _repositories)
+            foreach (var config in _configs)
             {
-                repository.Children.FindAllPaths(out var ids, sfTypeAttribute.Indent);
+                config.Children.FindAllPaths(out var ids, sfTypeAttribute.Indent);
 
                 if (sfTypeAttribute.Indent == 0)
                 {
-                    _paths.Add(repository.Id);
+                    _paths.Add(config.Id);
                 }
                 else
                 {
                     foreach (var id in ids)
                     {
-                        _paths.Add(string.Join("/", repository.Id, id));
+                        _paths.Add(string.Join("/", config.Id, id));
                     }
                 }
             }
