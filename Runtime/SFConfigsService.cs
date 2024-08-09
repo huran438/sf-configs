@@ -64,22 +64,22 @@ namespace SFramework.Configs.Runtime
             return Configs.Cast<T>();
         }
         
-        public bool TryGetConfigs<T>(out IEnumerable<T> configs) where T : ISFConfig
+        public bool TryGetConfigs<T>(out T[] configs) where T : ISFConfig
         {
             if (_repositoriesByType.TryGetValue(typeof(T), out var repo))
             {
-                configs = repo.Cast<T>();
+                configs = repo.Cast<T>().ToArray();
                 return true;
             }
 
             configs = Array.Empty<T>();
             return false;
         }
-        public bool TryGetNodesConfig<T>(out IEnumerable<T> configs) where T : ISFNodesConfig
+        public bool TryGetNodesConfigs<T>(out T[] configs) where T : ISFNodesConfig
         {
             if (_repositoriesByType.TryGetValue(typeof(T), out var repo))
             {
-                configs = repo.Cast<T>();
+                configs = repo.Cast<T>().ToArray();
                 return true;
             }
 

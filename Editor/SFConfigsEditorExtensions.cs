@@ -39,9 +39,9 @@ namespace SFramework.Configs.Editor
 
         public static HashSet<T> FindConfigs<T>(Type type, [CanBeNull] JsonSerializerSettings jsonSerializerSettings = null) where T : ISFConfig
         {
-            var _repositories = new HashSet<T>();
+            var configs = new HashSet<T>();
 
-            if (!SFConfigsSettings.Instance(out var settings)) return _repositories;
+            if (!SFConfigsSettings.Instance(out var settings)) return configs;
 
             var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
             {
@@ -50,8 +50,8 @@ namespace SFramework.Configs.Editor
 
             if (assetsGuids == null || assetsGuids.Length == 0)
             {
-                SFDebug.Log(LogType.Warning, "Missing Repository: {0}", type.Name);
-                return _repositories;
+                SFDebug.Log(LogType.Warning, "Missing Config: {0}", type.Name);
+                return configs;
             }
 
             foreach (var assetsGuid in assetsGuids)
@@ -61,13 +61,13 @@ namespace SFramework.Configs.Editor
                 text = Regex.Replace(text, "(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", "$1");
                 if (text.StartsWith($"{{\"Type\":\"{type.Name}\"") || text.EndsWith($"\"Type\":\"{type.Name}\"}}"))
                 {
-                    var repository =  (T)JsonConvert.DeserializeObject(text, type,jsonSerializerSettings);
+                    var repository = (T)JsonConvert.DeserializeObject(text, type, jsonSerializerSettings);
                     if (repository == null) continue;
-                    _repositories.Add(repository);
+                    configs.Add(repository);
                 }
             }
 
-            return _repositories;
+            return configs;
         }
 
         public static Dictionary<ISFConfig, string> FindConfigsWithPaths(Type type, [CanBeNull] JsonSerializerSettings jsonSerializerSettings = null)

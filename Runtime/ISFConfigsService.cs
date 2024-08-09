@@ -11,8 +11,7 @@ namespace SFramework.Configs.Runtime
     public interface ISFConfigsService : ISFService
     {
         public IEnumerable<ISFConfig> Configs { get; }
-        public bool TryGetConfigs<T>(out IEnumerable<T> configs) where T : ISFConfig;
-        public bool TryGetNodesConfig<T>(out IEnumerable<T> configs) where T : ISFNodesConfig;
+        public bool TryGetConfigs<T>(out T[] configs) where T : ISFConfig;
         public bool TryGetGlobalConfig<T>(out T config) where T : ISFGlobalConfig;
         
         [Obsolete]
