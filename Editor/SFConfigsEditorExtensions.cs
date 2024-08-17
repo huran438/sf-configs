@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
@@ -13,7 +14,119 @@ namespace SFramework.Configs.Editor
 {
     public static class SFConfigsEditorExtensions
     {
-        public static void RegenerateConfigs(bool indented)
+        private static readonly Dictionary<Type, Dictionary<ISFConfig, string>> _loadedConfigs = new();
+        private static readonly List<string> _ids = new(4096);
+        private static readonly List<string> _paths = new(4096);
+        private static readonly List<string> _paths2 = new(4096);
+        private static readonly List<string> _test = new(4096);
+
+        private static Dictionary<string, Dictionary<int, string[]>> _test2 = new();
+
+        [InitializeOnLoadMethod]
+        [MenuItem("Tools/SFramework/Refresh Configs")]
+        public static void RefreshConfigs()
+        {
+            EditorUtility.DisplayProgressBar("SFramework Configs", "Refreshing Configs Data. Please wait.", 0f);
+
+            _loadedConfigs.Clear();
+
+            var types = AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(a => a.GetTypes())
+                .Where(t => !t.IsAbstract && t.IsClass && typeof(ISFConfig).IsAssignableFrom(t))
+                .ToArray();
+
+            for (var index = 0; index < types.Length; index++)
+            {
+                var type = types[index];
+                _loadedConfigs.Add(type, FindConfigsInternal(type));
+
+                EditorUtility.DisplayProgressBar("SFramework Configs", "Refreshing Configs Data. Please wait.",
+                    Mathf.InverseLerp(0, types.Length, index));
+            }
+
+            foreach (var (type, configs) in _loadedConfigs)
+            {
+                var fullIds = new List<string>();
+                foreach (var (config, _) in configs)
+                {
+                    if (config is not ISFNodesConfig nodesConfig) continue;
+
+                    SFDebug.Log(nodesConfig.Id);
+                    
+                    if (nodesConfig.Children != null)
+                    {
+                        nodesConfig.Children.FindAllPaths(out var ids);
+
+                        for (var i = 0; i < ids.Count; i++)
+                        {
+                            var id = ids[i];
+                            var finalId = string.Join("/", nodesConfig.Id, id);
+                            fullIds.Add(finalId);
+                            SFDebug.Log(finalId);
+                        }
+                    }
+                    else
+                    {
+                        fullIds.Add(nodesConfig.Id);
+                    }
+                }
+
+                _test2.TryAdd(type.Name, SplitStringsIntoDictionary(fullIds.ToArray()));
+            }
+
+
+            EditorUtility.ClearProgressBar();
+        }
+
+        static Dictionary<int, string[]> SplitStringsIntoDictionary(string[] paths)
+        {
+            var result = new Dictionary<int, List<string>>();
+
+            // Ensure that "-" is included in the level 0
+            result[0] = new List<string> { "-" };
+
+            foreach (var path in paths)
+            {
+                string[] parts = path.Split('/');
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    string partialPath = string.Join("/", parts.Take(i + 1));
+
+                    if (!result.ContainsKey(i))
+                    {
+                        result[i] = new List<string> { "-" };
+                    }
+
+                    if (!result[i].Contains(partialPath))
+                    {
+                        result[i].Add(partialPath);
+                    }
+                }
+            }
+
+            // Convert List<string> to string[] in the dictionary
+            return result.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToArray());
+        }
+
+        public static string[] GetPaths(string type, int indent)
+        {
+            if (_test2.TryGetValue(type, out var d))
+            {
+                if (indent == -1)
+                {
+                    indent = d.Keys.Last();
+                }
+                
+                if (d.TryGetValue(indent, out var result))
+                {
+                    return result.ToArray();
+                }
+            }
+
+            return Array.Empty<string>();
+        }
+
+        public static void ReformatConfigs(bool jsonIndented)
         {
             if (!SFConfigsSettings.Instance(out var settings)) return;
 
@@ -24,7 +137,7 @@ namespace SFramework.Configs.Editor
 
             if (assetsGuids == null || assetsGuids.Length == 0)
             {
-                Debug.LogWarning("No Configs Found");
+                SFDebug.Log(LogType.Warning, "No Configs Found");
                 return;
             }
 
@@ -33,13 +146,13 @@ namespace SFramework.Configs.Editor
                 var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
                 var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
                 var repository = JObject.Parse(text);
-                System.IO.File.WriteAllText(path, repository.ToString(indented ? Formatting.Indented : Formatting.None));
+                System.IO.File.WriteAllText(path, repository.ToString(jsonIndented ? Formatting.Indented : Formatting.None));
             }
         }
 
-        public static HashSet<T> FindConfigs<T>(Type type, [CanBeNull] JsonSerializerSettings jsonSerializerSettings = null) where T : ISFConfig
+        private static Dictionary<ISFConfig, string> FindConfigsInternal(Type type)
         {
-            var configs = new HashSet<T>();
+            var configs = new Dictionary<ISFConfig, string>();
 
             if (!SFConfigsSettings.Instance(out var settings)) return configs;
 
@@ -54,57 +167,52 @@ namespace SFramework.Configs.Editor
                 return configs;
             }
 
+            var regex = new Regex("(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", RegexOptions.Compiled);
+
             foreach (var assetsGuid in assetsGuids)
             {
                 var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
                 var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
-                text = Regex.Replace(text, "(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", "$1");
+                text = regex.Replace(text, "$1");
                 if (text.StartsWith($"{{\"Type\":\"{type.Name}\"") || text.EndsWith($"\"Type\":\"{type.Name}\"}}"))
                 {
-                    var repository = (T)JsonConvert.DeserializeObject(text, type, jsonSerializerSettings);
+                    var repository = JsonConvert.DeserializeObject(text, type) as ISFConfig;
                     if (repository == null) continue;
-                    configs.Add(repository);
+                    configs.TryAdd(repository, path);
                 }
             }
 
             return configs;
         }
 
-        public static Dictionary<ISFConfig, string> FindConfigsWithPaths(Type type, [CanBeNull] JsonSerializerSettings jsonSerializerSettings = null)
+        private static HashSet<ISFConfig> FindConfigs(Type type)
+        {
+            var configs = new HashSet<ISFConfig>();
+
+            if (!_loadedConfigs.TryGetValue(type, out var _configs)) return configs;
+            foreach (var (config, _) in _configs)
+            {
+                configs.Add(config);
+            }
+
+            return configs;
+        }
+
+        public static Dictionary<ISFConfig, string> FindConfigsWithPaths(Type type)
         {
             var configs = new Dictionary<ISFConfig, string>();
 
-            if (!SFConfigsSettings.Instance(out var settings)) return configs;
+            if (!_loadedConfigs.TryGetValue(type, out var _configs)) return configs;
 
-            var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
+            foreach (var (config, path) in _configs)
             {
-                settings.ConfigsPath
-            });
-
-            if (assetsGuids == null || assetsGuids.Length == 0)
-            {
-                SFDebug.Log(LogType.Warning, "Missing Repository: {0}", type.Name);
-                return configs;
-            }
-
-            foreach (var assetsGuid in assetsGuids)
-            {
-                var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
-                var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
-                text = Regex.Replace(text, "(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", "$1");
-                if (text.StartsWith($"{{\"Type\":\"{type.Name}\"") || text.EndsWith($"\"Type\":\"{type.Name}\"}}"))
-                {
-                    var repository = JsonConvert.DeserializeObject(text, type, jsonSerializerSettings) as ISFConfig;
-                    if (repository == null) continue;
-                    configs[repository] = path;
-                }
+                configs.Add(config, path);
             }
 
             return configs;
         }
 
-
-        public static void FindAllPaths(this ISFConfigNode[] nodes, out List<string> paths, int targetLayer = -1)
+        private static void FindAllPaths(this ISFConfigNode[] nodes, out List<string> paths)
         {
             var ids = new HashSet<string>();
             paths = new List<string>();
@@ -127,12 +235,6 @@ namespace SFramework.Configs.Editor
                 var split = id.Split("/");
                 var path = string.Empty;
                 var childLevel = split.Length;
-
-                if (targetLayer > -1)
-                {
-                    if (childLevel < targetLayer) continue;
-                    childLevel = Mathf.Clamp(childLevel, 0, targetLayer);
-                }
 
                 for (var i = 0; i < childLevel; i++)
                 {
@@ -175,6 +277,111 @@ namespace SFramework.Configs.Editor
             }
 
             return paths;
+        }
+
+        // private static void FindAllPaths(this ISFConfigNode[] nodes, out List<string> paths)
+        // {
+        //     _ids.Clear();
+        //     _paths2.Clear();
+        //     paths = _paths2;
+        //
+        //     foreach (var root in nodes)
+        //     {
+        //         var childPaths = GetChildPaths(root, "");
+        //
+        //         if (childPaths == null) continue;
+        //
+        //         foreach (var path in childPaths)
+        //         {
+        //             _ids.Add(path);
+        //         }
+        //     }
+        //
+        //     foreach (var id in _ids)
+        //     {
+        //         _test.Clear();
+        //         foreach (var i in SplitString(id, '/'))
+        //         {
+        //             _test.Add(i);
+        //         }
+        //
+        //         var path = string.Empty;
+        //         var childLevel = _test.Count;
+        //
+        //         // if (targetLayer > -1)
+        //         // {
+        //         //     if (childLevel < targetLayer) continue;
+        //         //     childLevel = Mathf.Clamp(childLevel, 0, targetLayer);
+        //         // }
+        //
+        //         for (var i = 0; i < childLevel; i++)
+        //         {
+        //             path += _test[i];
+        //             if (i < childLevel - 1)
+        //             {
+        //                 path += "/";
+        //             }
+        //         }
+        //
+        //         if (string.IsNullOrWhiteSpace(path)) continue;
+        //
+        //         paths.Add(path);
+        //     }
+        // }
+        //
+        // private static List<string> GetChildPaths(ISFConfigNode node, string path)
+        // {
+        //     _paths.Clear();
+        //
+        //     path += node.Id;
+        //
+        //     if (node.Children == null)
+        //     {
+        //         _paths.Add(path);
+        //         return _paths;
+        //     }
+        //
+        //     if (node.Children.Length == 0)
+        //     {
+        //         _paths.Add(path);
+        //         return _paths;
+        //     }
+        //
+        //     foreach (var child in node.Children)
+        //     {
+        //         var childPaths = GetChildPaths(child, path + "/");
+        //         if (childPaths == null) continue;
+        //         _paths.AddRange(childPaths);
+        //     }
+        //
+        //     return _paths;
+        // }
+
+        private static IEnumerable<string> SplitString(string s, char c)
+        {
+            int l = s.Length;
+            int i = 0, j = s.IndexOf(c, 0, l);
+            if (j == -1) // No such substring
+            {
+                yield return s; // Return original and break
+                yield break;
+            }
+
+            while (j != -1)
+            {
+                if (j - i > 0) // Non empty? 
+                {
+                    yield return s.Substring(i, j - i); // Return non-empty match
+                }
+
+                i = j + 1;
+                j = s.IndexOf(c, i, l - i);
+            }
+
+            if (i < l) // Has remainder?
+            {
+                yield return s.Substring(i, l - i); // Return remaining trail
+            }
         }
     }
 }

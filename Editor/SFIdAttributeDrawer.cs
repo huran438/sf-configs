@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using SFramework.Configs.Runtime;
+using SFramework.Core.Runtime;
 using UnityEditor;
 using UnityEngine;
 
@@ -10,21 +11,7 @@ namespace SFramework.Configs.Editor
     [CustomPropertyDrawer(typeof(SFIdAttribute), true)]
     public class SFIdAttributeDrawer : PropertyDrawer
     {
-        private readonly HashSet<ISFNodesConfig> _configs = new HashSet<ISFNodesConfig>();
-        private readonly List<string> _paths = new List<string>();
         private bool _canDraw;
-
-        private bool CheckAndLoadDatabase(Type type)
-        {
-            if (_configs.Count != 0) return true;
-
-            foreach (var config in SFConfigsEditorExtensions.FindConfigs<ISFNodesConfig>(type))
-            {
-                _configs.Add(config);
-            }
-
-            return _configs.Count != 0;
-        }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
@@ -46,7 +33,14 @@ namespace SFramework.Configs.Editor
                 return;
             }
 
-            if (!CheckAndLoadDatabase(sfTypeAttribute.Type)) return;
+            var _paths = SFConfigsEditorExtensions.GetPaths(sfTypeAttribute.Type.Name, sfTypeAttribute.Indent);
+            if (_paths == null || _paths.Length == 0)
+            {
+                GUI.backgroundColor = Color.red;
+                EditorGUI.LabelField(position, "Paths is empty! Current value: " + property.stringValue);
+                GUI.backgroundColor = Color.white;
+                return;
+            }
 
             EditorGUI.BeginProperty(position, label, property);
             position = EditorGUI.PrefixLabel(position, GUIUtility.GetControlID(FocusType.Passive), label);
@@ -58,26 +52,6 @@ namespace SFramework.Configs.Editor
                 property.stringValue = string.Empty;
             }
             
-            _paths.Clear();
-            _paths.Add("-");
-
-            foreach (var config in _configs)
-            {
-                config.Children.FindAllPaths(out var ids, sfTypeAttribute.Indent);
-
-                if (sfTypeAttribute.Indent == 0)
-                {
-                    _paths.Add(config.Id);
-                }
-                else
-                {
-                    foreach (var id in ids)
-                    {
-                        _paths.Add(string.Join("/", config.Id, id));
-                    }
-                }
-            }
-
             if (!string.IsNullOrWhiteSpace(property.stringValue) && !_paths.Contains(property.stringValue))
             {
                 GUI.backgroundColor = Color.red;
@@ -90,7 +64,7 @@ namespace SFramework.Configs.Editor
                     ? property.stringValue
                     : _paths[0];
 
-                var index = _paths.IndexOf(name);
+                var index = Array.IndexOf(_paths, name);
 
                 EditorGUI.BeginChangeCheck();
 
@@ -99,13 +73,13 @@ namespace SFramework.Configs.Editor
                     GUI.backgroundColor = Color.red;
                 }
 
-                index = EditorGUI.Popup(position, index, _paths.ToArray());
+                index = EditorGUI.Popup(position, index, _paths);
 
                 GUI.backgroundColor = Color.white;
 
                 if (EditorGUI.EndChangeCheck())
                 {
-                    property.stringValue = index == 0 ? string.Empty : _paths.ElementAt(index);
+                    property.stringValue = index == 0 ? string.Empty : _paths[index];
                 }
             }
 
