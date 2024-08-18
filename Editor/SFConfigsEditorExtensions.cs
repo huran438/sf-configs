@@ -50,8 +50,6 @@ namespace SFramework.Configs.Editor
                 foreach (var (config, _) in configs)
                 {
                     if (config is not ISFNodesConfig nodesConfig) continue;
-
-                    SFDebug.Log(nodesConfig.Id);
                     
                     if (nodesConfig.Children != null)
                     {
@@ -62,7 +60,6 @@ namespace SFramework.Configs.Editor
                             var id = ids[i];
                             var finalId = string.Join("/", nodesConfig.Id, id);
                             fullIds.Add(finalId);
-                            SFDebug.Log(finalId);
                         }
                     }
                     else
