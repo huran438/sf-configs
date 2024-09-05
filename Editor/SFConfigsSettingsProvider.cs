@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using SFramework.Configs.Runtime;
 using SFramework.Core.Runtime;
 using UnityEditor;
 
@@ -13,7 +14,7 @@ namespace SFramework.Configs.Editor
             {
                 guiHandler = _ =>
                 {
-                    if (!SFCoreSettings.Instance(out var settings)) return;
+                    if (!SFConfigsSettings.Instance(out var settings)) return;
                     var settingsSO = new SerializedObject(settings);
                     EditorGUILayout.PropertyField(settingsSO.FindProperty("ConfigsPath"));
                     settingsSO.ApplyModifiedPropertiesWithoutUndo();
