@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
-using JetBrains.Annotations;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SFramework.Configs.Runtime;
@@ -15,11 +14,6 @@ namespace SFramework.Configs.Editor
     public static class SFConfigsEditorExtensions
     {
         private static readonly Dictionary<Type, Dictionary<ISFConfig, string>> _loadedConfigs = new();
-        private static readonly List<string> _ids = new(4096);
-        private static readonly List<string> _paths = new(4096);
-        private static readonly List<string> _paths2 = new(4096);
-        private static readonly List<string> _test = new(4096);
-
         private static Dictionary<string, Dictionary<int, string[]>> _test2 = new();
 
         [InitializeOnLoadMethod]
@@ -29,6 +23,7 @@ namespace SFramework.Configs.Editor
             EditorUtility.DisplayProgressBar("SFramework Configs", "Refreshing Configs Data. Please wait.", 0f);
 
             _loadedConfigs.Clear();
+            _test2.Clear();
 
             var types = AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(a => a.GetTypes())
@@ -274,111 +269,6 @@ namespace SFramework.Configs.Editor
             }
 
             return paths;
-        }
-
-        // private static void FindAllPaths(this ISFConfigNode[] nodes, out List<string> paths)
-        // {
-        //     _ids.Clear();
-        //     _paths2.Clear();
-        //     paths = _paths2;
-        //
-        //     foreach (var root in nodes)
-        //     {
-        //         var childPaths = GetChildPaths(root, "");
-        //
-        //         if (childPaths == null) continue;
-        //
-        //         foreach (var path in childPaths)
-        //         {
-        //             _ids.Add(path);
-        //         }
-        //     }
-        //
-        //     foreach (var id in _ids)
-        //     {
-        //         _test.Clear();
-        //         foreach (var i in SplitString(id, '/'))
-        //         {
-        //             _test.Add(i);
-        //         }
-        //
-        //         var path = string.Empty;
-        //         var childLevel = _test.Count;
-        //
-        //         // if (targetLayer > -1)
-        //         // {
-        //         //     if (childLevel < targetLayer) continue;
-        //         //     childLevel = Mathf.Clamp(childLevel, 0, targetLayer);
-        //         // }
-        //
-        //         for (var i = 0; i < childLevel; i++)
-        //         {
-        //             path += _test[i];
-        //             if (i < childLevel - 1)
-        //             {
-        //                 path += "/";
-        //             }
-        //         }
-        //
-        //         if (string.IsNullOrWhiteSpace(path)) continue;
-        //
-        //         paths.Add(path);
-        //     }
-        // }
-        //
-        // private static List<string> GetChildPaths(ISFConfigNode node, string path)
-        // {
-        //     _paths.Clear();
-        //
-        //     path += node.Id;
-        //
-        //     if (node.Children == null)
-        //     {
-        //         _paths.Add(path);
-        //         return _paths;
-        //     }
-        //
-        //     if (node.Children.Length == 0)
-        //     {
-        //         _paths.Add(path);
-        //         return _paths;
-        //     }
-        //
-        //     foreach (var child in node.Children)
-        //     {
-        //         var childPaths = GetChildPaths(child, path + "/");
-        //         if (childPaths == null) continue;
-        //         _paths.AddRange(childPaths);
-        //     }
-        //
-        //     return _paths;
-        // }
-
-        private static IEnumerable<string> SplitString(string s, char c)
-        {
-            int l = s.Length;
-            int i = 0, j = s.IndexOf(c, 0, l);
-            if (j == -1) // No such substring
-            {
-                yield return s; // Return original and break
-                yield break;
-            }
-
-            while (j != -1)
-            {
-                if (j - i > 0) // Non empty? 
-                {
-                    yield return s.Substring(i, j - i); // Return non-empty match
-                }
-
-                i = j + 1;
-                j = s.IndexOf(c, i, l - i);
-            }
-
-            if (i < l) // Has remainder?
-            {
-                yield return s.Substring(i, l - i); // Return remaining trail
-            }
         }
     }
 }

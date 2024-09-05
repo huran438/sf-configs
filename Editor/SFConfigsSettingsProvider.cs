@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using SFramework.Configs.Runtime;
+using SFramework.Core.Runtime;
 using UnityEditor;
 
 namespace SFramework.Configs.Editor
@@ -11,15 +11,16 @@ namespace SFramework.Configs.Editor
         {
             var provider = new SettingsProvider("Project/SFramework/Configs", SettingsScope.Project)
             {
-                guiHandler = (_) =>
+                guiHandler = _ =>
                 {
-                    if (!SFConfigsSettings.Instance(out var settings)) return;
+                    if (!SFCoreSettings.Instance(out var settings)) return;
                     var settingsSO = new SerializedObject(settings);
                     EditorGUILayout.PropertyField(settingsSO.FindProperty("ConfigsPath"));
                     settingsSO.ApplyModifiedPropertiesWithoutUndo();
                     AssetDatabase.SaveAssetIfDirty(settingsSO.targetObject);
                 },
 
+                // Populate the search keywords to enable smart search filtering and label highlighting:
                 keywords = new HashSet<string>(new[] { "SF", "Configs" })
             };
 
