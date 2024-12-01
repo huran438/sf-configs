@@ -11,7 +11,7 @@ namespace SFramework.Configs.Runtime
     [Serializable]
     public abstract class SFConfigNode : ISFConfigNode
     {
-        public void BuildTree()
+        public virtual void BuildTree()
         {
             if (Parent == null)
             {

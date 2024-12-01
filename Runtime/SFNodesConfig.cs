@@ -9,7 +9,7 @@ namespace SFramework.Configs.Runtime
     [Serializable]
     public abstract class SFNodesConfig : ISFNodesConfig
     {
-        public void BuildTree()
+        public virtual void BuildTree()
         {
             FullId = Id;
             if (Children == null) return;
