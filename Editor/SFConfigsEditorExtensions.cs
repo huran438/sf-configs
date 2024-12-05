@@ -17,6 +17,15 @@ namespace SFramework.Configs.Editor
         private static Dictionary<string, Dictionary<int, string[]>> _test2 = new();
 
         [InitializeOnLoadMethod]
+        public static void EditorLoading()
+        {
+            if (!SessionState.GetBool("FirstInitDone", false))
+            {
+                RefreshConfigs();
+                SessionState.SetBool("FirstInitDone", true);
+            }
+        }
+        
         [MenuItem("Tools/SFramework/Refresh Configs")]
         public static void RefreshConfigs()
         {
@@ -120,8 +129,14 @@ namespace SFramework.Configs.Editor
 
         public static void ReformatConfigs(bool jsonIndented)
         {
-            if (!SFConfigsSettings.Instance(out var settings)) return;
+            if (!SFConfigsSettings.TryGetInstance(out var settings)) return;
 
+            if (string.IsNullOrEmpty(settings.ConfigsPath))
+            {
+                SFDebug.Log(LogType.Error, "SFConfigs Path is empty. Check SFramework/Resources folder and adjust settings.");
+                return;
+            }
+            
             var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
             {
                 settings.ConfigsPath
@@ -146,7 +161,13 @@ namespace SFramework.Configs.Editor
         {
             var configs = new Dictionary<ISFConfig, string>();
 
-            if (!SFConfigsSettings.Instance(out var settings)) return configs;
+            if (!SFConfigsSettings.TryGetInstance(out var settings)) return configs;
+            
+            if (string.IsNullOrEmpty(settings.ConfigsPath))
+            {
+                SFDebug.Log(LogType.Error, "SFConfigs Path is empty. Check SFramework/Resources folder and adjust settings.");
+                return configs;
+            }
 
             var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
             {
