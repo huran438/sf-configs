@@ -25,7 +25,7 @@ namespace SFramework.Configs.Editor
                 SessionState.SetBool("FirstInitDone", true);
             }
         }
-        
+
         [MenuItem("Tools/SFramework/Refresh Configs")]
         public static void RefreshConfigs()
         {
@@ -54,7 +54,7 @@ namespace SFramework.Configs.Editor
                 foreach (var (config, _) in configs)
                 {
                     if (config is not ISFNodesConfig nodesConfig) continue;
-                    
+
                     if (nodesConfig.Children != null)
                     {
                         nodesConfig.Children.FindAllPaths(out var ids);
@@ -117,7 +117,7 @@ namespace SFramework.Configs.Editor
                 {
                     indent = d.Keys.Last();
                 }
-                
+
                 if (d.TryGetValue(indent, out var result))
                 {
                     return result.ToArray();
@@ -130,68 +130,76 @@ namespace SFramework.Configs.Editor
         public static void ReformatConfigs(bool jsonIndented)
         {
             if (!SFConfigsSettings.TryGetInstance(out var settings)) return;
-
-            if (string.IsNullOrEmpty(settings.ConfigsPath))
-            {
-                SFDebug.Log(LogType.Error, "SFConfigs Path is empty. Check SFramework/Resources folder and adjust settings.");
-                return;
-            }
+            if (settings.ConfigsPaths == null) return;
             
-            var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
+            foreach (var configsPath in settings.ConfigsPaths)
             {
-                settings.ConfigsPath
-            });
+                if (string.IsNullOrEmpty(configsPath))
+                {
+                    SFDebug.Log(LogType.Error, "SFConfigs Path is empty. Check SFramework/Resources folder and adjust settings.");
+                    return;
+                }
 
-            if (assetsGuids == null || assetsGuids.Length == 0)
-            {
-                SFDebug.Log(LogType.Warning, "No Configs Found");
-                return;
-            }
+                var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
+                {
+                    configsPath
+                });
 
-            foreach (var assetsGuid in assetsGuids)
-            {
-                var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
-                var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
-                var repository = JObject.Parse(text);
-                System.IO.File.WriteAllText(path, repository.ToString(jsonIndented ? Formatting.Indented : Formatting.None));
+                if (assetsGuids == null || assetsGuids.Length == 0)
+                {
+                    SFDebug.Log(LogType.Warning, "No Configs Found");
+                    return;
+                }
+
+                foreach (var assetsGuid in assetsGuids)
+                {
+                    var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
+                    var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
+                    var repository = JObject.Parse(text);
+                    System.IO.File.WriteAllText(path, repository.ToString(jsonIndented ? Formatting.Indented : Formatting.None));
+                }
             }
         }
 
         private static Dictionary<ISFConfig, string> FindConfigsInternal(Type type)
         {
             var configs = new Dictionary<ISFConfig, string>();
-
             if (!SFConfigsSettings.TryGetInstance(out var settings)) return configs;
-            
-            if (string.IsNullOrEmpty(settings.ConfigsPath))
-            {
-                SFDebug.Log(LogType.Error, "SFConfigs Path is empty. Check SFramework/Resources folder and adjust settings.");
-                return configs;
-            }
+            if (settings.ConfigsPaths == null) return configs;
 
-            var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
+            foreach (var configsPath in settings.ConfigsPaths)
             {
-                settings.ConfigsPath
-            });
 
-            if (assetsGuids == null || assetsGuids.Length == 0)
-            {
-                SFDebug.Log(LogType.Warning, "Missing Config: {0}", type.Name);
-                return configs;
-            }
-
-            var regex = new Regex("(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", RegexOptions.Compiled);
-
-            foreach (var assetsGuid in assetsGuids)
-            {
-                var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
-                var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
-                text = regex.Replace(text, "$1");
-                if (text.StartsWith($"{{\"Type\":\"{type.Name}\"") || text.EndsWith($"\"Type\":\"{type.Name}\"}}"))
+                if (string.IsNullOrEmpty(configsPath))
                 {
-                    var repository = JsonConvert.DeserializeObject(text, type) as ISFConfig;
-                    if (repository == null) continue;
-                    configs.TryAdd(repository, path);
+                    SFDebug.Log(LogType.Error, "SFConfigs Path is empty. Check SFramework/Resources folder and adjust settings.");
+                    return configs;
+                }
+
+                var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
+                {
+                    configsPath
+                });
+
+                if (assetsGuids == null || assetsGuids.Length == 0)
+                {
+                    SFDebug.Log(LogType.Warning, "Missing Config: {0}", type.Name);
+                    return configs;
+                }
+
+                var regex = new Regex("(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", RegexOptions.Compiled);
+
+                foreach (var assetsGuid in assetsGuids)
+                {
+                    var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
+                    var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
+                    text = regex.Replace(text, "$1");
+                    if (text.StartsWith($"{{\"Type\":\"{type.Name}\"") || text.EndsWith($"\"Type\":\"{type.Name}\"}}"))
+                    {
+                        var repository = JsonConvert.DeserializeObject(text, type) as ISFConfig;
+                        if (repository == null) continue;
+                        configs.TryAdd(repository, path);
+                    }
                 }
             }
 

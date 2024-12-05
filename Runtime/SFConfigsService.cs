@@ -5,7 +5,6 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
-using SFramework.Core.Runtime;
 using UnityEngine;
 
 namespace SFramework.Configs.Runtime
@@ -13,7 +12,7 @@ namespace SFramework.Configs.Runtime
     public class SFConfigsService : ISFConfigsService
     {
         private readonly Dictionary<Type, HashSet<object>> _repositoriesByType = new();
-        private readonly HashSet<ISFConfig> _configs = new HashSet<ISFConfig>();
+        private readonly HashSet<ISFConfig> _configs = new();
 
         public UniTask Init(CancellationToken cancellationToken)
         {
