@@ -16,17 +16,8 @@ namespace SFramework.Configs.Editor
         private static readonly Dictionary<Type, Dictionary<ISFConfig, string>> _loadedConfigs = new();
         private static Dictionary<string, Dictionary<int, string[]>> _test2 = new();
 
-        [InitializeOnLoadMethod]
-        public static void EditorLoading()
-        {
-            if (!SessionState.GetBool("FirstInitDone", false))
-            {
-                RefreshConfigs();
-                SessionState.SetBool("FirstInitDone", true);
-            }
-        }
-
         [MenuItem("Tools/SFramework/Refresh Configs")]
+        [InitializeOnLoadMethod]
         public static void RefreshConfigs()
         {
             EditorUtility.DisplayProgressBar("SFramework Configs", "Refreshing Configs Data. Please wait.", 0f);
