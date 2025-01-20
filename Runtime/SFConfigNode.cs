@@ -33,7 +33,7 @@ namespace SFramework.Configs.Runtime
         [SerializeField, JsonIgnore]
         private string _id;
 
-        public string Id
+        public virtual string Id
         {
             get => _id;
             set => _id = value;

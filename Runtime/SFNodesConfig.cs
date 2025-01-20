@@ -25,18 +25,12 @@ namespace SFramework.Configs.Runtime
         private string _id;
 
         public string Type { get; set; }
-        public int Version { get; set; }
+        public long Version { get; set; }
 
         public string Id
         {
-            get
-            {
-                return _id;
-            }
-            set
-            {
-                _id = value;
-            }
+            get => _id;
+            set => _id = value;
         }
 
         public string FullId { get; set; }

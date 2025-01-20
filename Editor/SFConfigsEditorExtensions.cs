@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
@@ -122,7 +123,7 @@ namespace SFramework.Configs.Editor
         {
             if (!SFConfigsSettings.TryGetInstance(out var settings)) return;
             if (settings.ConfigsPaths == null) return;
-            
+
             foreach (var configsPath in settings.ConfigsPaths)
             {
                 if (string.IsNullOrEmpty(configsPath))
@@ -147,9 +148,23 @@ namespace SFramework.Configs.Editor
                     var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
                     var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
                     var repository = JObject.Parse(text);
+                    repository["Version"] = ToUnixTime(DateTime.UtcNow).ToString(CultureInfo.InvariantCulture);
                     System.IO.File.WriteAllText(path, repository.ToString(jsonIndented ? Formatting.Indented : Formatting.None));
                 }
             }
+        }
+        
+        
+        private static readonly DateTime epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        public static DateTime FromUnixTime(this long unixTime)
+        {
+            return epoch.AddSeconds(unixTime);
+        }
+        
+        public static long ToUnixTime(this DateTime date)
+        {
+            return Convert.ToInt64((date - epoch).TotalSeconds);
         }
 
         private static Dictionary<ISFConfig, string> FindConfigsInternal(Type type)
@@ -160,7 +175,6 @@ namespace SFramework.Configs.Editor
 
             foreach (var configsPath in settings.ConfigsPaths)
             {
-
                 if (string.IsNullOrEmpty(configsPath))
                 {
                     SFDebug.Log(LogType.Error, "SFConfigs Path is empty. Check SFramework/Resources folder and adjust settings.");

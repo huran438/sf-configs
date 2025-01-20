@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using UnityEngine.Scripting;
+using System;
 
 namespace SFramework.Configs.Runtime
 {
@@ -10,6 +11,6 @@ namespace SFramework.Configs.Runtime
         public string Type { get; set; }
         
         [JsonProperty(Order = -437)]
-        public int Version { get; set; }
+        public long Version { get; set; }
     }
 }
