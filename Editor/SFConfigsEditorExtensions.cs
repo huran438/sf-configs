@@ -152,6 +152,9 @@ namespace SFramework.Configs.Editor
                     System.IO.File.WriteAllText(path, repository.ToString(jsonIndented ? Formatting.Indented : Formatting.None));
                 }
             }
+            
+            AssetDatabase.Refresh();
+            AssetDatabase.SaveAssets();
         }
         
         
