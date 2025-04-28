@@ -14,59 +14,67 @@ namespace SFramework.Configs.Editor
 {
     public static class SFConfigsEditorExtensions
     {
-        private static readonly Dictionary<Type, Dictionary<ISFConfig, string>> _loadedConfigs = new();
-        private static Dictionary<string, Dictionary<int, string[]>> _test2 = new();
+        private static readonly Dictionary<Type, Dictionary<ISFConfig, string>> _configInstancesByType = new();
+        private static Dictionary<string, Dictionary<int, string[]>> _nodeIdLookupByType = new();
 
         [MenuItem("Tools/SFramework/Refresh Configs")]
         [InitializeOnLoadMethod]
         public static void RefreshConfigs()
         {
-            EditorUtility.DisplayProgressBar("SFramework Configs", "Refreshing Configs Data. Please wait.", 0f);
+            EditorUtility.DisplayProgressBar("SFramework Configs", "Refreshing configuration data. Please wait...", 0f);
 
-            _loadedConfigs.Clear();
-            _test2.Clear();
+            _configInstancesByType.Clear();
+            _nodeIdLookupByType.Clear();
 
-            var types = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a => a.GetTypes())
-                .Where(t => !t.IsAbstract && t.IsClass && typeof(ISFConfig).IsAssignableFrom(t))
+            // Cache config types for performance
+            var configTypes = AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(assembly => assembly.GetTypes())
+                .Where(type => !type.IsAbstract && type.IsClass && typeof(ISFConfig).IsAssignableFrom(type))
                 .ToArray();
 
-            for (var index = 0; index < types.Length; index++)
+            const int progressUpdateStep = 10;
+            for (var i = 0; i < configTypes.Length; i++)
             {
-                var type = types[index];
-                _loadedConfigs.Add(type, FindConfigsInternal(type));
+                var configType = configTypes[i];
+                _configInstancesByType.Add(configType, FindConfigsInternal(configType));
 
-                EditorUtility.DisplayProgressBar("SFramework Configs", "Refreshing Configs Data. Please wait.",
-                    Mathf.InverseLerp(0, types.Length, index));
+                if (i % progressUpdateStep == 0 || i == configTypes.Length - 1)
+                {
+                    EditorUtility.DisplayProgressBar(
+                        "SFramework Configs",
+                        $"Refreshing configuration data for {configType.Name}...",
+                        Mathf.InverseLerp(0, configTypes.Length, i)
+                    );
+                }
             }
 
-            foreach (var (type, configs) in _loadedConfigs)
+            foreach (var (configType, configInstances) in _configInstancesByType)
             {
-                var fullIds = new List<string>();
-                foreach (var (config, _) in configs)
+                var allNodeIds = new List<string>();
+                foreach (var (configInstance, _) in configInstances)
                 {
-                    if (config is not ISFNodesConfig nodesConfig) continue;
+                    if (configInstance is not ISFNodesConfig nodesConfig)
+                        continue;
 
                     if (nodesConfig.Children != null)
                     {
-                        nodesConfig.Children.FindAllPaths(out var ids);
+                        nodesConfig.Children.FindAllPaths(out var childNodeIds);
 
-                        for (var i = 0; i < ids.Count; i++)
+                        for (var j = 0; j < childNodeIds.Count; j++)
                         {
-                            var id = ids[i];
-                            var finalId = string.Join("/", nodesConfig.Id, id);
-                            fullIds.Add(finalId);
+                            var childNodeId = childNodeIds[j];
+                            var fullNodeId = string.Join("/", nodesConfig.Id, childNodeId);
+                            allNodeIds.Add(fullNodeId);
                         }
                     }
                     else
                     {
-                        fullIds.Add(nodesConfig.Id);
+                        allNodeIds.Add(nodesConfig.Id);
                     }
                 }
 
-                _test2.TryAdd(type.Name, SplitStringsIntoDictionary(fullIds.ToArray()));
+                _nodeIdLookupByType.TryAdd(configType.Name, SplitStringsIntoDictionary(allNodeIds.ToArray()));
             }
-
 
             EditorUtility.ClearProgressBar();
         }
@@ -103,7 +111,7 @@ namespace SFramework.Configs.Editor
 
         public static string[] GetPaths(string type, int indent)
         {
-            if (_test2.TryGetValue(type, out var d))
+            if (_nodeIdLookupByType.TryGetValue(type, out var d))
             {
                 if (indent == -1)
                 {
@@ -218,7 +226,7 @@ namespace SFramework.Configs.Editor
         {
             var configs = new HashSet<ISFConfig>();
 
-            if (!_loadedConfigs.TryGetValue(type, out var _configs)) return configs;
+            if (!_configInstancesByType.TryGetValue(type, out var _configs)) return configs;
             foreach (var (config, _) in _configs)
             {
                 configs.Add(config);
@@ -231,7 +239,7 @@ namespace SFramework.Configs.Editor
         {
             var configs = new Dictionary<ISFConfig, string>();
 
-            if (!_loadedConfigs.TryGetValue(type, out var _configs)) return configs;
+            if (!_configInstancesByType.TryGetValue(type, out var _configs)) return configs;
 
             foreach (var (config, path) in _configs)
             {
