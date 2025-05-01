@@ -120,11 +120,11 @@ namespace SFramework.Configs.Editor
 
                 if (d.TryGetValue(indent, out var result))
                 {
-                    return result.ToArray();
+                    return result;
                 }
             }
 
-            return Array.Empty<string>();
+            return null;
         }
 
         public static void ReformatConfigs(bool jsonIndented)

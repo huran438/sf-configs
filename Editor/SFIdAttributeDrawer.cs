@@ -9,8 +9,6 @@ namespace SFramework.Configs.Editor
     [CustomPropertyDrawer(typeof(SFIdAttribute), true)]
     public class SFIdAttributeDrawer : PropertyDrawer
     {
-        private bool _canDraw;
-
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             if (property.propertyType != SerializedPropertyType.String)
@@ -21,9 +19,7 @@ namespace SFramework.Configs.Editor
                 return;
             }
 
-            var sfTypeAttribute = attribute as SFIdAttribute;
-
-            if (sfTypeAttribute == null)
+            if (attribute is not SFIdAttribute sfTypeAttribute)
             {
                 GUI.backgroundColor = Color.red;
                 EditorGUI.LabelField(position, "Attribute is null!");
@@ -63,22 +59,22 @@ namespace SFramework.Configs.Editor
                     : _paths[0];
 
                 var index = Array.IndexOf(_paths, name);
-
-                EditorGUI.BeginChangeCheck();
-
+                
                 if (index == 0)
                 {
                     GUI.backgroundColor = Color.red;
                 }
-
+                
+                EditorGUI.BeginChangeCheck();
+                
                 index = EditorGUI.Popup(position, index, _paths);
-
-                GUI.backgroundColor = Color.white;
-
+                
                 if (EditorGUI.EndChangeCheck())
                 {
                     property.stringValue = index == 0 ? string.Empty : _paths[index];
                 }
+                
+                GUI.backgroundColor = Color.white;
             }
 
             EditorGUI.indentLevel = indent;
