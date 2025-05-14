@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SFramework.Configs.Runtime;
@@ -17,8 +21,137 @@ namespace SFramework.Configs.Editor
         private static readonly Dictionary<Type, Dictionary<ISFConfig, string>> _configInstancesByType = new();
         private static Dictionary<string, Dictionary<int, string[]>> _nodeIdLookupByType = new();
 
+        #region hashSetNotValidDomain
+        private static readonly HashSet<string> internalAssemblyNames = new HashSet<string>()
+{
+    "mscorlib",
+    "System",
+    "System.Core",
+    "System.Security.Cryptography.Algorithms",
+    "System.Net.Http",
+    "System.Data",
+    "System.Runtime.Serialization",
+    "System.Xml.Linq",
+    "System.Numerics",
+    "System.Xml",
+    "System.Configuration",
+    "ExCSS.Unity",
+    "Unity.Cecil",
+    "Unity.CompilationPipeline.Common",
+    "Unity.SerializationLogic",
+    "Unity.TestTools.CodeCoverage.Editor",
+    "Unity.ScriptableBuildPipeline.Editor",
+    "Unity.Addressables.Editor",
+    "Unity.ScriptableBuildPipeline",
+    "Unity.CollabProxy.Editor",
+    "Unity.Timeline.Editor",
+    "Unity.PerformanceTesting.Tests.Runtime",
+    "Unity.Settings.Editor",
+    "Unity.PerformanceTesting",
+    "Unity.PerformanceTesting.Editor",
+    "Unity.Rider.Editor",
+    "Unity.ResourceManager",
+    "Unity.TestTools.CodeCoverage.Editor.OpenCover.Mono.Reflection",
+    "Unity.PerformanceTesting.Tests.Editor",
+    "Unity.TextMeshPro",
+    "Unity.Timeline",
+    "Unity.Addressables",
+    "Unity.TestTools.CodeCoverage.Editor.OpenCover.Model",
+    "Unity.VisualStudio.Editor",
+    "Unity.TextMeshPro.Editor",
+    "Unity.VSCode.Editor", 
+    "UnityEditor",
+    "UnityEditor.UI",
+    "UnityEditor.TestRunner",
+    "UnityEditor.CacheServer",
+    "UnityEditor.WindowsStandalone.Extensions",
+    "UnityEditor.Graphs",
+    "UnityEditor.UnityConnectModule",
+    "UnityEditor.UIServiceModule",
+    "UnityEditor.UIElementsSamplesModule",
+    "UnityEditor.UIElementsModule",
+    "UnityEditor.SceneTemplateModule",
+    "UnityEditor.PackageManagerUIModule",
+    "UnityEditor.GraphViewModule",
+    "UnityEditor.CoreModule",
+    "UnityEngine",
+    "UnityEngine.UI",
+    "UnityEngine.XRModule",
+    "UnityEngine.WindModule",
+    "UnityEngine.VirtualTexturingModule",
+    "UnityEngine.TestRunner",
+    "UnityEngine.VideoModule",
+    "UnityEngine.VehiclesModule",
+    "UnityEngine.VRModule",
+    "UnityEngine.VFXModule",
+    "UnityEngine.UnityWebRequestWWWModule",
+    "UnityEngine.UnityWebRequestTextureModule",
+    "UnityEngine.UnityWebRequestAudioModule",
+    "UnityEngine.UnityWebRequestAssetBundleModule",
+    "UnityEngine.UnityWebRequestModule",
+    "UnityEngine.UnityTestProtocolModule",
+    "UnityEngine.UnityCurlModule",
+    "UnityEngine.UnityConnectModule",
+    "UnityEngine.UnityAnalyticsModule",
+    "UnityEngine.UmbraModule",
+    "UnityEngine.UNETModule",
+    "UnityEngine.UIElementsNativeModule",
+    "UnityEngine.UIElementsModule",
+    "UnityEngine.UIModule",
+    "UnityEngine.TilemapModule",
+    "UnityEngine.TextRenderingModule",
+    "UnityEngine.TextCoreModule",
+    "UnityEngine.TerrainPhysicsModule",
+    "UnityEngine.TerrainModule",
+    "UnityEngine.TLSModule",
+    "UnityEngine.SubsystemsModule",
+    "UnityEngine.SubstanceModule",
+    "UnityEngine.StreamingModule",
+    "UnityEngine.SpriteShapeModule",
+    "UnityEngine.SpriteMaskModule",
+    "UnityEngine.SharedInternalsModule",
+    "UnityEngine.ScreenCaptureModule",
+    "UnityEngine.RuntimeInitializeOnLoadManagerInitializerModule",
+    "UnityEngine.ProfilerModule",
+    "UnityEngine.Physics2DModule",
+    "UnityEngine.PhysicsModule",
+    "UnityEngine.PerformanceReportingModule",
+    "UnityEngine.ParticleSystemModule",
+    "UnityEngine.LocalizationModule",
+    "UnityEngine.JSONSerializeModule",
+    "UnityEngine.InputLegacyModule",
+    "UnityEngine.InputModule",
+    "UnityEngine.ImageConversionModule",
+    "UnityEngine.IMGUIModule",
+    "UnityEngine.HotReloadModule",
+    "UnityEngine.GridModule",
+    "UnityEngine.GameCenterModule",
+    "UnityEngine.GIModule",
+    "UnityEngine.DirectorModule",
+    "UnityEngine.DSPGraphModule",
+    "UnityEngine.CrashReportingModule",
+    "UnityEngine.CoreModule",
+    "UnityEngine.ClusterRendererModule",
+    "UnityEngine.ClusterInputModule",
+    "UnityEngine.ClothModule",
+    "UnityEngine.AudioModule",
+    "UnityEngine.AssetBundleModule",
+    "UnityEngine.AnimationModule",
+    "UnityEngine.AndroidJNIModule",
+    "UnityEngine.AccessibilityModule",
+    "UnityEngine.ARModule",
+    "UnityEngine.AIModule",
+    "SyntaxTree.VisualStudio.Unity.Bridge",
+    "nunit.framework",
+    "Newtonsoft.Json",
+    "ReportGeneratorMerged",
+    "Unrelated",
+    "netstandard",
+    "SyntaxTree.VisualStudio.Unity.Messaging"
+};
+        #endregion
+
         [MenuItem("Tools/SFramework/Refresh Configs")]
-        [InitializeOnLoadMethod]
         public static void RefreshConfigs()
         {
             EditorUtility.DisplayProgressBar("SFramework Configs", "Refreshing configuration data. Please wait...", 0f);
@@ -27,31 +160,43 @@ namespace SFramework.Configs.Editor
             _nodeIdLookupByType.Clear();
 
             // Cache config types for performance
-            var configTypes = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(assembly => assembly.GetTypes())
-                .Where(type => !type.IsAbstract && type.IsClass && typeof(ISFConfig).IsAssignableFrom(type))
-                .ToArray();
-
-            const int progressUpdateStep = 10;
-            for (var i = 0; i < configTypes.Length; i++)
+            Dictionary<string, Type> configTypes;
             {
-                var configType = configTypes[i];
-                _configInstancesByType.Add(configType, FindConfigsInternal(configType));
+                var configType = typeof(ISFConfig);
 
-                if (i % progressUpdateStep == 0 || i == configTypes.Length - 1)
+                bool WhereTypeIsValid(Type type)
                 {
+                    return
+                        type.IsClass &&
+                        !type.IsAbstract &&
+                        configType.IsAssignableFrom(type);
+                }
+
+                configTypes = AppDomain.CurrentDomain.GetAssemblies()
+                    .Where(a => !a.IsDynamic && !internalAssemblyNames.Contains(a.FullName))
+                    .SelectMany(assembly => assembly.GetTypes())
+                    .Where(WhereTypeIsValid)
+                    .ToDictionary(type => type.Name, type => type);
+            }
+
+            //TODO: 95% CPU time O(n^2)
+            foreach (var keyValuePair in configTypes)
+            {
+                var configType = keyValuePair.Value;
+                _configInstancesByType.Add(configType, FindConfigsInternal(configType));
+                
                     EditorUtility.DisplayProgressBar(
                         "SFramework Configs",
                         $"Refreshing configuration data for {configType.Name}...",
-                        Mathf.InverseLerp(0, configTypes.Length, i)
+                        0.4f
                     );
-                }
+                
             }
 
-            foreach (var (configType, configInstances) in _configInstancesByType)
+            void FindNodes(KeyValuePair<Type, Dictionary<ISFConfig, string>> keyValuePair)
             {
                 var allNodeIds = new List<string>();
-                foreach (var (configInstance, _) in configInstances)
+                foreach (var (configInstance, _) in keyValuePair.Value)
                 {
                     if (configInstance is not ISFNodesConfig nodesConfig)
                         continue;
@@ -73,8 +218,13 @@ namespace SFramework.Configs.Editor
                     }
                 }
 
-                _nodeIdLookupByType.TryAdd(configType.Name, SplitStringsIntoDictionary(allNodeIds.ToArray()));
+                lock (_nodeIdLookupByType)
+                {
+                    _nodeIdLookupByType.TryAdd(keyValuePair.Key.Name, SplitStringsIntoDictionary(allNodeIds.ToArray()));
+                }
             }
+            
+            Parallel.ForEach(_configInstancesByType, FindNodes);
 
             EditorUtility.ClearProgressBar();
         }
@@ -183,6 +333,8 @@ namespace SFramework.Configs.Editor
             var configs = new Dictionary<ISFConfig, string>();
             if (!SFConfigsSettings.TryGetInstance(out var settings)) return configs;
             if (settings.ConfigsPaths == null) return configs;
+            
+            var regex = new Regex("(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", RegexOptions.Compiled);
 
             foreach (var configsPath in settings.ConfigsPaths)
             {
@@ -202,14 +354,25 @@ namespace SFramework.Configs.Editor
                     SFDebug.Log(LogType.Warning, "Missing Config: {0}", type.Name);
                     return configs;
                 }
-
-                var regex = new Regex("(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", RegexOptions.Compiled);
+                
 
                 foreach (var assetsGuid in assetsGuids)
                 {
                     var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
                     var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
+
+                    var s = "\"Type\":";
+                    var first = text.IndexOf(s, 0, Mathf.Min(text.Length - s.Length, 32), StringComparison.Ordinal);
+                    if (first == -1) continue;
+                    first = text.IndexOf("\"", first + s.Length, Mathf.Min(text.Length - s.Length, 32), StringComparison.Ordinal);
+                    var end = text.IndexOf("\",", first , Mathf.Min(text.Length - first, 256), StringComparison.Ordinal);
+                    if (end == -1) continue;
+                    var typeName = text.Substring(first, end - first).Replace(" ", "");
+                    
+                    if (!typeName.Contains(type.Name)) continue;
+                    
                     text = regex.Replace(text, "$1");
+                    
                     if (text.StartsWith($"{{\"Type\":\"{type.Name}\"") || text.EndsWith($"\"Type\":\"{type.Name}\"}}"))
                     {
                         var repository = JsonConvert.DeserializeObject(text, type) as ISFConfig;
