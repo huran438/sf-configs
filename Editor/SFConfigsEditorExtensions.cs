@@ -154,6 +154,7 @@ namespace SFramework.Configs.Editor
         [MenuItem("Tools/SFramework/Refresh Configs")]
         public static void RefreshConfigs()
         {
+            
             EditorUtility.DisplayProgressBar("SFramework Configs", "Refreshing configuration data. Please wait...", 0f);
 
             _configInstancesByType.Clear();
@@ -179,19 +180,7 @@ namespace SFramework.Configs.Editor
                     .ToDictionary(type => type.Name, type => type);
             }
 
-            //TODO: 95% CPU time O(n^2)
-            foreach (var keyValuePair in configTypes)
-            {
-                var configType = keyValuePair.Value;
-                _configInstancesByType.Add(configType, FindConfigsInternal(configType));
-                
-                    EditorUtility.DisplayProgressBar(
-                        "SFramework Configs",
-                        $"Refreshing configuration data for {configType.Name}...",
-                        0.4f
-                    );
-                
-            }
+            FindConfigsInternal(configTypes);
 
             void FindNodes(KeyValuePair<Type, Dictionary<ISFConfig, string>> keyValuePair)
             {
@@ -218,16 +207,19 @@ namespace SFramework.Configs.Editor
                     }
                 }
 
+                var splits = SplitStringsIntoDictionary(allNodeIds.ToArray());
                 lock (_nodeIdLookupByType)
                 {
-                    _nodeIdLookupByType.TryAdd(keyValuePair.Key.Name, SplitStringsIntoDictionary(allNodeIds.ToArray()));
+                    _nodeIdLookupByType.TryAdd(keyValuePair.Key.Name, splits);
                 }
             }
-            
-            Parallel.ForEach(_configInstancesByType, FindNodes);
 
-			AssetDatabase.Refresh();
-            AssetDatabase.SaveAssets();
+            List<Task> tasks = new List<Task>();
+            foreach (var keyValue in _configInstancesByType)
+            {
+                tasks.Add(Task.Run(() => FindNodes(keyValue)));
+            }
+            Task.WaitAll(tasks.ToArray());
 
             EditorUtility.ClearProgressBar();
         }
@@ -282,35 +274,16 @@ namespace SFramework.Configs.Editor
 
         public static void ReformatConfigs(bool jsonIndented)
         {
-            if (!SFConfigsSettings.TryGetInstance(out var settings)) return;
-            if (settings.ConfigsPaths == null) return;
-
-            foreach (var configsPath in settings.ConfigsPaths)
+            foreach (var pathToConfigsFolder in GetAbsPathToConfigsFolders())
             {
-                if (string.IsNullOrEmpty(configsPath))
+                foreach (var pathToConfigFile in GetAbsPathToAllJsonSubFiles(pathToConfigsFolder))
                 {
-                    SFDebug.Log(LogType.Error, "SFConfigs Path is empty. Check SFramework/Resources folder and adjust settings.");
-                    return;
-                }
-
-                var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
-                {
-                    configsPath
-                });
-
-                if (assetsGuids == null || assetsGuids.Length == 0)
-                {
-                    SFDebug.Log(LogType.Warning, "No Configs Found");
-                    return;
-                }
-
-                foreach (var assetsGuid in assetsGuids)
-                {
-                    var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
-                    var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
+                    var text = File.ReadAllText(pathToConfigFile);
                     var repository = JObject.Parse(text);
                     repository["Version"] = ToUnixTime(DateTime.UtcNow).ToString(CultureInfo.InvariantCulture);
-                    File.WriteAllText(path, repository.ToString(jsonIndented ? Formatting.Indented : Formatting.None));
+                    File.WriteAllText(pathToConfigFile, 
+                        repository.ToString(jsonIndented ? Formatting.Indented : Formatting.None));
+
                 }
             }
         }
@@ -328,52 +301,63 @@ namespace SFramework.Configs.Editor
             return Convert.ToInt64((date - epoch).TotalSeconds);
         }
 
-        private static Dictionary<ISFConfig, string> FindConfigsInternal(Type type)
+        private static void FindConfigsInternal(Dictionary<string, Type> types)
         {
-            var configs = new Dictionary<ISFConfig, string>();
-            if (!SFConfigsSettings.TryGetInstance(out var settings)) return configs;
-            if (settings.ConfigsPaths == null) return configs;
+            if (!SFConfigsSettings.TryGetInstance(out var settings)) return;
+            if (settings.ConfigsPaths == null) return;
             
             var regex = new Regex("(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", RegexOptions.Compiled);
 
             foreach (var pathToConfigsFolder in GetAbsPathToConfigsFolders())
             {
-                foreach (var pathToConfigFile in GetAbsPathToAllJsonSubFiles(pathToConfigsFolder))
+                List<Task> tasks = new List<Task>();
+                foreach (var pathToConfig in GetAbsPathToAllJsonSubFiles(pathToConfigsFolder))
+                {
+                    tasks.Add(Task.Run(() => GetConfigFile(pathToConfig)));
+                }
+                Task.WaitAll(tasks.ToArray());
+
+                void GetConfigFile(string pathToConfigFile)
                 {
                     var text = File.ReadAllText(pathToConfigFile);
 
                     var s = "\"Type\":";
                     var first = text.IndexOf(s, 0, Mathf.Min(text.Length - s.Length, 32), StringComparison.Ordinal);
-                    if (first == -1) continue;
+                    if (first == -1) return;
                     first = text.IndexOf("\"", first + s.Length, Mathf.Min(text.Length - s.Length, 32), StringComparison.Ordinal);
                     var end = text.IndexOf("\",", first , Mathf.Min(text.Length - first, 256), StringComparison.Ordinal);
-                    if (end == -1) continue;
-                    var typeName = text.Substring(first, end - first).Replace(" ", "");
+                    if (end == -1) return;
+                    var typeName = text.Substring(first+1, end - first-1);
                     
-                    if (!typeName.Contains(type.Name)) continue;
+                    if (!types.TryGetValue(typeName, out var type)) return;
                     
                     text = regex.Replace(text, "$1");
                     
-                    
                     {
                         var repository = JsonConvert.DeserializeObject(text, type) as ISFConfig;
-                        if (repository == null) continue;
-                        configs.TryAdd(repository, pathToConfigFile);
+                        if (repository == null) return;
+                        
+                        Dictionary<ISFConfig, string> configDictionary;
+                        lock (_configInstancesByType)
+                        {
+                            if (!_configInstancesByType.TryGetValue(type, out configDictionary))
+                            {
+                                configDictionary = new();
+                                _configInstancesByType.TryAdd(type, configDictionary);
+                            }
+
+                            configDictionary.TryAdd(repository, pathToConfigFile);
+                        }
                     }
                 }
             }
-
-            return configs;
         }
-        
+
         private static IEnumerable<string> GetAbsPathToAllJsonSubFiles(string path)
         {
-            foreach (string directory in Directory.GetDirectories(path, "*", SearchOption.AllDirectories))
+            foreach (var file in Directory.GetFiles(path, "*.json", SearchOption.AllDirectories))
             {
-                foreach (var file in Directory.GetFiles(directory, "*.json", SearchOption.AllDirectories))
-                {
-                    yield return file;
-                }
+                yield return file;
             }
         }
 
