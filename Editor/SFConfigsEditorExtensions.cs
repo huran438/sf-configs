@@ -226,6 +226,9 @@ namespace SFramework.Configs.Editor
             
             Parallel.ForEach(_configInstancesByType, FindNodes);
 
+			AssetDatabase.Refresh();
+            AssetDatabase.SaveAssets();
+
             EditorUtility.ClearProgressBar();
         }
 
