@@ -307,12 +307,9 @@ namespace SFramework.Configs.Editor
                     var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
                     var repository = JObject.Parse(text);
                     repository["Version"] = ToUnixTime(DateTime.UtcNow).ToString(CultureInfo.InvariantCulture);
-                    System.IO.File.WriteAllText(path, repository.ToString(jsonIndented ? Formatting.Indented : Formatting.None));
+                    File.WriteAllText(path, repository.ToString(jsonIndented ? Formatting.Indented : Formatting.None));
                 }
             }
-            
-            AssetDatabase.Refresh();
-            AssetDatabase.SaveAssets();
         }
         
         
@@ -336,30 +333,11 @@ namespace SFramework.Configs.Editor
             
             var regex = new Regex("(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", RegexOptions.Compiled);
 
-            foreach (var configsPath in settings.ConfigsPaths)
+            foreach (var pathToConfigsFolder in GetAbsPathToConfigsFolders())
             {
-                if (string.IsNullOrEmpty(configsPath))
+                foreach (var pathToConfigFile in GetAbsPathToAllJsonSubFiles(pathToConfigsFolder))
                 {
-                    SFDebug.Log(LogType.Error, "SFConfigs Path is empty. Check SFramework/Resources folder and adjust settings.");
-                    return configs;
-                }
-
-                var assetsGuids = AssetDatabase.FindAssets("t:TextAsset", new[]
-                {
-                    configsPath
-                });
-
-                if (assetsGuids == null || assetsGuids.Length == 0)
-                {
-                    SFDebug.Log(LogType.Warning, "Missing Config: {0}", type.Name);
-                    return configs;
-                }
-                
-
-                foreach (var assetsGuid in assetsGuids)
-                {
-                    var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
-                    var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
+                    var text = File.ReadAllText(pathToConfigFile);
 
                     var s = "\"Type\":";
                     var first = text.IndexOf(s, 0, Mathf.Min(text.Length - s.Length, 32), StringComparison.Ordinal);
@@ -373,16 +351,43 @@ namespace SFramework.Configs.Editor
                     
                     text = regex.Replace(text, "$1");
                     
-                    if (text.StartsWith($"{{\"Type\":\"{type.Name}\"") || text.EndsWith($"\"Type\":\"{type.Name}\"}}"))
+                    
                     {
                         var repository = JsonConvert.DeserializeObject(text, type) as ISFConfig;
                         if (repository == null) continue;
-                        configs.TryAdd(repository, path);
+                        configs.TryAdd(repository, pathToConfigFile);
                     }
                 }
             }
 
             return configs;
+        }
+        
+        private static IEnumerable<string> GetAbsPathToAllJsonSubFiles(string path)
+        {
+            foreach (string directory in Directory.GetDirectories(path, "*", SearchOption.AllDirectories))
+            {
+                foreach (var file in Directory.GetFiles(directory, "*.json", SearchOption.AllDirectories))
+                {
+                    yield return file;
+                }
+            }
+        }
+
+        private static IEnumerable<string> GetAbsPathToConfigsFolders()
+        {
+            if (!SFConfigsSettings.TryGetInstance(out var settings)) throw new KeyNotFoundException();
+            if (settings.ConfigsPaths == null) throw new DirectoryNotFoundException();
+            
+            foreach (var configsPath in settings.ConfigsPaths)
+            {
+                if (string.IsNullOrEmpty(configsPath))
+                {
+                    throw new DirectoryNotFoundException("SFConfigs Path is empty. Check SFramework/Resources folder and adjust settings.");
+                }
+                
+                yield return Path.GetFullPath(Path.Combine(Application.dataPath, Path.GetRelativePath(Application.dataPath, configsPath)));
+            }
         }
 
         private static HashSet<ISFConfig> FindConfigs(Type type)
