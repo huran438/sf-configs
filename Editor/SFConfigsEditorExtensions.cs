@@ -16,8 +16,9 @@ namespace SFramework.Configs.Editor
     public static class SFConfigsEditorExtensions
     {
         private static readonly Dictionary<Type, Dictionary<ISFConfig, string>> _configInstancesByType = new();
-        private static Dictionary<string, Dictionary<int, string[]>> _nodeIdLookupByType = new();
-        private static bool initialized = false;
+        private static readonly Dictionary<string, Dictionary<int, string[]>> _nodeIdLookupByType = new();
+        private static bool initialized;
+        private static readonly Regex _jsonWhitespaceRegex = new("(\"(?:[^\\\"\\\\]|\\\\.)*\")|\\s+", RegexOptions.Compiled);
 
         static SFConfigsEditorExtensions()
         {
@@ -40,58 +41,84 @@ namespace SFramework.Configs.Editor
         public static void RefreshConfigs()
         {
             EditorUtility.DisplayProgressBar("SFramework Configs", "Refreshing configuration data. Please wait...", 0f);
-
             _configInstancesByType.Clear();
             _nodeIdLookupByType.Clear();
 
-            // Cache config types for performance
-            var configTypes = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(assembly => assembly.GetTypes())
-                .Where(type => !type.IsAbstract && type.IsClass && typeof(ISFConfig).IsAssignableFrom(type))
-                .ToArray();
-
-            const int progressUpdateStep = 10;
-            for (var i = 0; i < configTypes.Length; i++)
+            if (!SFConfigsSettings.TryGetInstance(out var settings) || settings.ConfigsPaths == null || settings.ConfigsPaths.Length == 0)
             {
-                var configType = configTypes[i];
-                _configInstancesByType.Add(configType, FindConfigsInternal(configType));
-
-                if (i % progressUpdateStep == 0 || i == configTypes.Length - 1)
+                SFDebug.Log(LogType.Error, "SFConfigs Paths not set or empty.");
+                EditorUtility.ClearProgressBar();
+                return;
+            }
+            
+            var allAssets = new List<(string Path, string Text)>();
+            foreach (var configsPath in settings.ConfigsPaths)
+            {
+                if (string.IsNullOrEmpty(configsPath)) continue;
+                var guids = AssetDatabase.FindAssets("t:TextAsset", new[] { configsPath });
+                if (guids == null) continue;
+                foreach (var guid in guids)
                 {
-                    EditorUtility.DisplayProgressBar(
-                        "SFramework Configs",
-                        $"Refreshing configuration data for {configType.Name}...",
-                        Mathf.InverseLerp(0, configTypes.Length, i)
-                    );
+                    var path = AssetDatabase.GUIDToAssetPath(guid);
+                    var raw = AssetDatabase.LoadAssetAtPath<TextAsset>(path)?.text;
+                    if (string.IsNullOrEmpty(raw)) continue;
+                    allAssets.Add((path, _jsonWhitespaceRegex.Replace(raw, "$1")));
                 }
             }
-
-            foreach (var (configType, configInstances) in _configInstancesByType)
+            
+            var assetsByType = new Dictionary<string, List<(string Path, string Text)>>();
+            const string typeKey = "\"Type\":\"";
+            foreach (var (path, text) in allAssets)
             {
-                var allNodeIds = new List<string>();
-                foreach (var (configInstance, _) in configInstances)
+                var idx = text.IndexOf(typeKey, StringComparison.Ordinal);
+                if (idx < 0) continue;
+                var start = idx + typeKey.Length;
+                var end = text.IndexOf('"', start);
+                if (end < 0) continue;
+                var typeName = text.Substring(start, end - start);
+                if (!assetsByType.TryGetValue(typeName, out var list))
+                    assetsByType[typeName] = list = new List<(string, string)>();
+                list.Add((path, text));
+            }
+            
+            var configTypes = AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(a => a.GetTypes())
+                .Where(t => !t.IsAbstract && t.IsClass && typeof(ISFConfig).IsAssignableFrom(t));
+            int total = configTypes.Count();
+            int index = 0;
+            foreach (var type in configTypes)
+            {
+                index++;
+                EditorUtility.DisplayProgressBar("SFramework Configs", $"Processing {type.Name} ({index}/{total})...", (float)index / total);
+
+                if (assetsByType.TryGetValue(type.Name, out var entries))
                 {
-                    if (configInstance is not ISFNodesConfig nodesConfig)
-                        continue;
-
-                    if (nodesConfig.Children != null)
-                    {
-                        nodesConfig.Children.FindAllPaths(out var childNodeIds);
-
-                        for (var j = 0; j < childNodeIds.Count; j++)
-                        {
-                            var childNodeId = childNodeIds[j];
-                            var fullNodeId = string.Join("/", nodesConfig.Id, childNodeId);
-                            allNodeIds.Add(fullNodeId);
-                        }
-                    }
-                    else
-                    {
-                        allNodeIds.Add(nodesConfig.Id);
-                    }
+                    var dict = new Dictionary<ISFConfig, string>();
+                    foreach (var (path, txt) in entries)
+                        if (JsonConvert.DeserializeObject(txt, type) is ISFConfig inst)
+                            dict[inst] = path;
+                    _configInstancesByType[type] = dict;
                 }
-
-                _nodeIdLookupByType.TryAdd(configType.Name, SplitStringsIntoDictionary(allNodeIds.ToArray()));
+                else
+                {
+                    _configInstancesByType[type] = new Dictionary<ISFConfig, string>();
+                    SFDebug.Log(LogType.Warning, $"No configs found for type {type.Name}");
+                }
+            }
+            
+            foreach (var kv in _configInstancesByType)
+            {
+                var allIds = new List<string>();
+                foreach (var cfg in kv.Value.Keys)
+                    if (cfg is ISFNodesConfig nodes && nodes.Children != null)
+                    {
+                        nodes.Children.FindAllPaths(out var ids);
+                        foreach (var id in ids)
+                            allIds.Add($"{nodes.Id}/{id}");
+                    }
+                    else if (cfg is ISFNodesConfig simple && simple.Children == null)
+                        allIds.Add(simple.Id);
+                _nodeIdLookupByType[kv.Key.Name] = SplitStringsIntoDictionary(allIds.ToArray());
             }
 
             EditorUtility.ClearProgressBar();
@@ -100,8 +127,7 @@ namespace SFramework.Configs.Editor
         static Dictionary<int, string[]> SplitStringsIntoDictionary(string[] paths)
         {
             var result = new Dictionary<int, List<string>>();
-
-            // Ensure that "-" is included in the level 0
+            
             result[0] = new List<string> { "-" };
 
             foreach (var path in paths)
@@ -122,8 +148,7 @@ namespace SFramework.Configs.Editor
                     }
                 }
             }
-
-            // Convert List<string> to string[] in the dictionary
+            
             return result.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToArray());
         }
 
