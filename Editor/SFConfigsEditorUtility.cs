@@ -13,27 +13,27 @@ using UnityEngine;
 namespace SFramework.Configs.Editor
 {
     [InitializeOnLoad]
-    public static class SFConfigsEditorExtensions
+    public static class SFConfigsEditorUtility
     {
-        private static readonly Dictionary<Type, Dictionary<ISFConfig, string>> _configInstancesByType = new();
-        private static readonly Dictionary<string, Dictionary<int, string[]>> _nodeIdLookupByType = new();
-        private static bool initialized;
+        private static readonly Dictionary<Type, Dictionary<ISFConfig, string>> _configsByType = new();
+        private static readonly Dictionary<string, Dictionary<int, string[]>> _nodePathsByType = new();
+        private static bool _isInitialized;
         private static readonly Regex _jsonWhitespaceRegex = new("(\"(?:[^\\\"\\\\]|\\\\.)*\")|\\s+", RegexOptions.Compiled);
 
-        static SFConfigsEditorExtensions()
+        static SFConfigsEditorUtility()
         {
-            EditorApplication.update += TryInitializeOnce;
+            EditorApplication.update += EnsureInitialized;
         }
 
-        private static void TryInitializeOnce()
+        private static void EnsureInitialized()
         {
-            if (initialized)
+            if (_isInitialized)
                 return;
 
-            initialized = true;
+            _isInitialized = true;
             RefreshConfigs();
             Debug.Log("SFConfigs Editor Initialized");
-            EditorApplication.update -= TryInitializeOnce;
+            EditorApplication.update -= EnsureInitialized;
         }
 
 
@@ -41,8 +41,8 @@ namespace SFramework.Configs.Editor
         public static void RefreshConfigs()
         {
             EditorUtility.DisplayProgressBar("SFramework Configs", "Refreshing configuration data. Please wait...", 0f);
-            _configInstancesByType.Clear();
-            _nodeIdLookupByType.Clear();
+            _configsByType.Clear();
+            _nodePathsByType.Clear();
 
             if (!SFConfigsSettings.TryGetInstance(out var settings) || settings.ConfigsPaths == null || settings.ConfigsPaths.Length == 0)
             {
@@ -97,16 +97,16 @@ namespace SFramework.Configs.Editor
                     foreach (var (path, txt) in entries)
                         if (JsonConvert.DeserializeObject(txt, type) is ISFConfig inst)
                             dict[inst] = path;
-                    _configInstancesByType[type] = dict;
+                    _configsByType[type] = dict;
                 }
                 else
                 {
-                    _configInstancesByType[type] = new Dictionary<ISFConfig, string>();
+                    _configsByType[type] = new Dictionary<ISFConfig, string>();
                     SFDebug.Log(LogType.Warning, $"No configs found for type {type.Name}");
                 }
             }
             
-            foreach (var kv in _configInstancesByType)
+            foreach (var kv in _configsByType)
             {
                 var allIds = new List<string>();
                 foreach (var cfg in kv.Value.Keys)
@@ -118,13 +118,13 @@ namespace SFramework.Configs.Editor
                     }
                     else if (cfg is ISFNodesConfig simple && simple.Children == null)
                         allIds.Add(simple.Id);
-                _nodeIdLookupByType[kv.Key.Name] = SplitStringsIntoDictionary(allIds.ToArray());
+                _nodePathsByType[kv.Key.Name] = BuildPathsByIndentLevel(allIds.ToArray());
             }
 
             EditorUtility.ClearProgressBar();
         }
 
-        static Dictionary<int, string[]> SplitStringsIntoDictionary(string[] paths)
+        static Dictionary<int, string[]> BuildPathsByIndentLevel(string[] paths)
         {
             var result = new Dictionary<int, List<string>>();
             
@@ -152,16 +152,16 @@ namespace SFramework.Configs.Editor
             return result.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToArray());
         }
 
-        public static string[] GetPaths(string type, int indent)
+        public static string[] GetNodePaths(string typeName, int indentLevel)
         {
-            if (_nodeIdLookupByType.TryGetValue(type, out var d))
+            if (_nodePathsByType.TryGetValue(typeName, out var d))
             {
-                if (indent == -1)
+                if (indentLevel == -1)
                 {
-                    indent = d.Keys.Last();
+                    indentLevel = d.Keys.Last();
                 }
 
-                if (d.TryGetValue(indent, out var result))
+                if (d.TryGetValue(indentLevel, out var result))
                 {
                     return result;
                 }
@@ -170,7 +170,7 @@ namespace SFramework.Configs.Editor
             return null;
         }
 
-        public static void ReformatConfigs(bool jsonIndented)
+        public static void FormatConfigs(bool indentJson)
         {
             if (!SFConfigsSettings.TryGetInstance(out var settings)) return;
             if (settings.ConfigsPaths == null) return;
@@ -202,7 +202,7 @@ namespace SFramework.Configs.Editor
                     var repository = JObject.Parse(text);
                     repository["Version"] = ToUnixTime(DateTime.UtcNow).ToString(CultureInfo.InvariantCulture);
                     System.IO.File.WriteAllText(path,
-                        repository.ToString(jsonIndented ? Formatting.Indented : Formatting.None));
+                        repository.ToString(indentJson ? Formatting.Indented : Formatting.None));
                 }
             }
 
@@ -272,7 +272,7 @@ namespace SFramework.Configs.Editor
         {
             var configs = new HashSet<ISFConfig>();
 
-            if (!_configInstancesByType.TryGetValue(type, out var _configs)) return configs;
+            if (!_configsByType.TryGetValue(type, out var _configs)) return configs;
             foreach (var (config, _) in _configs)
             {
                 configs.Add(config);
@@ -285,7 +285,7 @@ namespace SFramework.Configs.Editor
         {
             var configs = new Dictionary<ISFConfig, string>();
 
-            if (!_configInstancesByType.TryGetValue(type, out var _configs)) return configs;
+            if (!_configsByType.TryGetValue(type, out var _configs)) return configs;
 
             foreach (var (config, path) in _configs)
             {

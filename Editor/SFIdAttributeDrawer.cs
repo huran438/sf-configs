@@ -27,7 +27,7 @@ namespace SFramework.Configs.Editor
                 return;
             }
 
-            var _paths = SFConfigsEditorExtensions.GetPaths(sfTypeAttribute.Type.Name, sfTypeAttribute.Indent);
+            var _paths = SFConfigsEditorUtility.GetNodePaths(sfTypeAttribute.Type.Name, sfTypeAttribute.Indent);
             if (_paths == null || _paths.Length == 0)
             {
                 GUI.backgroundColor = Color.red;
