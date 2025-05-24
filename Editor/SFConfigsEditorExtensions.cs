@@ -12,13 +12,31 @@ using UnityEngine;
 
 namespace SFramework.Configs.Editor
 {
+    [InitializeOnLoad]
     public static class SFConfigsEditorExtensions
     {
         private static readonly Dictionary<Type, Dictionary<ISFConfig, string>> _configInstancesByType = new();
         private static Dictionary<string, Dictionary<int, string[]>> _nodeIdLookupByType = new();
+        private static bool initialized = false;
+
+        static SFConfigsEditorExtensions()
+        {
+            EditorApplication.update += TryInitializeOnce;
+        }
+
+        private static void TryInitializeOnce()
+        {
+            if (initialized)
+                return;
+
+            initialized = true;
+            RefreshConfigs();
+            Debug.Log("SFConfigs Editor Initialized");
+            EditorApplication.update -= TryInitializeOnce;
+        }
+
 
         [MenuItem("Tools/SFramework/Refresh Configs")]
-        [InitializeOnLoadMethod]
         public static void RefreshConfigs()
         {
             EditorUtility.DisplayProgressBar("SFramework Configs", "Refreshing configuration data. Please wait...", 0f);
@@ -136,7 +154,8 @@ namespace SFramework.Configs.Editor
             {
                 if (string.IsNullOrEmpty(configsPath))
                 {
-                    SFDebug.Log(LogType.Error, "SFConfigs Path is empty. Check SFramework/Resources folder and adjust settings.");
+                    SFDebug.Log(LogType.Error,
+                        "SFConfigs Path is empty. Check SFramework/Resources folder and adjust settings.");
                     return;
                 }
 
@@ -157,22 +176,23 @@ namespace SFramework.Configs.Editor
                     var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
                     var repository = JObject.Parse(text);
                     repository["Version"] = ToUnixTime(DateTime.UtcNow).ToString(CultureInfo.InvariantCulture);
-                    System.IO.File.WriteAllText(path, repository.ToString(jsonIndented ? Formatting.Indented : Formatting.None));
+                    System.IO.File.WriteAllText(path,
+                        repository.ToString(jsonIndented ? Formatting.Indented : Formatting.None));
                 }
             }
-            
+
             AssetDatabase.Refresh();
             AssetDatabase.SaveAssets();
         }
-        
-        
+
+
         private static readonly DateTime epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         public static DateTime FromUnixTime(this long unixTime)
         {
             return epoch.AddSeconds(unixTime);
         }
-        
+
         public static long ToUnixTime(this DateTime date)
         {
             return Convert.ToInt64((date - epoch).TotalSeconds);
@@ -188,7 +208,8 @@ namespace SFramework.Configs.Editor
             {
                 if (string.IsNullOrEmpty(configsPath))
                 {
-                    SFDebug.Log(LogType.Error, "SFConfigs Path is empty. Check SFramework/Resources folder and adjust settings.");
+                    SFDebug.Log(LogType.Error,
+                        "SFConfigs Path is empty. Check SFramework/Resources folder and adjust settings.");
                     return configs;
                 }
 
