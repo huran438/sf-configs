@@ -1,4 +1,4 @@
-﻿using SFramework.Configs.Runtime;
+using SFramework.Configs.Runtime;
 using UnityEditor;
 using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Settings;
@@ -52,7 +52,8 @@ namespace SFramework.Configs.Editor
                         }
                         else
                         {
-                            Debug.LogWarning($"Asset '{newAsset.name}' is not addressable. Only Addressables are allowed.");
+                            Debug.LogWarning(
+                                $"Asset '{newAsset.name}' is not addressable. Only Addressables are allowed.");
                         }
                     }
                     else
@@ -142,8 +143,28 @@ namespace SFramework.Configs.Editor
 
             // General addressable
             var path = AssetDatabase.GetAssetPath(asset);
-            var entry = Settings?.FindAssetEntry(AssetDatabase.AssetPathToGUID(path));
-            return entry != null ? entry.address : null;
+            var assetGuid = AssetDatabase.AssetPathToGUID(path);
+            var entry = Settings?.FindAssetEntry(assetGuid, true);
+            if (entry == null)
+            {
+                // Make asset addressable
+                var defaultGroup = Settings?.DefaultGroup;
+                if (defaultGroup == null) return null;
+                entry = Settings.CreateOrMoveEntry(assetGuid, defaultGroup);
+                if (entry != null)
+                {
+                    entry.address = path;
+                    Settings.SetDirty(AddressableAssetSettings.ModificationEvent.EntryAdded, entry, true, false);
+                    AssetDatabase.SaveAssets();
+                    AssetDatabase.Refresh();
+                }
+                else
+                {
+                    return null;
+                }
+            }
+
+            return entry.address;
         }
     }
 }
