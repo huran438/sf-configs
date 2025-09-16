@@ -4,8 +4,7 @@
     "references": [
         "SFramework.Configs.Runtime",
         "SFramework.Core.Runtime",
-        "SFramework.Core.Editor",
-        "Unity.Addressables.Editor"
+        "SFramework.Core.Editor"
     ],
     "includePlatforms": [
         "Editor"

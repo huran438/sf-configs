@@ -86,6 +86,7 @@ namespace SFramework.Configs.Editor
                 .Where(t => !t.IsAbstract && t.IsClass && typeof(ISFConfig).IsAssignableFrom(t));
             int total = configTypes.Count();
             int index = 0;
+            bool createdAny = false;
             foreach (var type in configTypes)
             {
                 index++;
@@ -101,8 +102,22 @@ namespace SFramework.Configs.Editor
                 }
                 else
                 {
-                    _configsByType[type] = new Dictionary<ISFConfig, string>();
-                    SFDebug.Log(LogType.Warning, $"No configs found for type {type.Name}");
+                    // No configs found for this type. Create a default one and save it.
+                    if (TryCreateDefaultConfig(type, settings, out var createdConfig, out var createdPath))
+                    {
+                        var dict = new Dictionary<ISFConfig, string>
+                        {
+                            [createdConfig] = createdPath
+                        };
+                        _configsByType[type] = dict;
+                        createdAny = true;
+                        SFDebug.Log(LogType.Log, $"Created default config for type {type.Name} at {createdPath}");
+                    }
+                    else
+                    {
+                        _configsByType[type] = new Dictionary<ISFConfig, string>();
+                        SFDebug.Log(LogType.Warning, $"No configs found for type {type.Name} and failed to create a default config.");
+                    }
                 }
             }
             
@@ -122,6 +137,11 @@ namespace SFramework.Configs.Editor
             }
 
             EditorUtility.ClearProgressBar();
+            if (createdAny)
+            {
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+            }
         }
 
         static Dictionary<int, string[]> BuildPathsByIndentLevel(string[] paths)
@@ -168,6 +188,85 @@ namespace SFramework.Configs.Editor
             }
 
             return null;
+        }
+
+        private static bool TryCreateDefaultConfig(Type type, SFConfigsSettings settings, out ISFConfig createdConfig, out string createdPath)
+        {
+            createdConfig = null;
+            createdPath = null;
+            if (settings == null || settings.ConfigsPaths == null || settings.ConfigsPaths.Length == 0)
+                return false;
+
+            foreach (var rawPath in settings.ConfigsPaths)
+            {
+                if (string.IsNullOrEmpty(rawPath)) continue;
+                var basePath = rawPath.Replace('\\', '/').Trim('/');
+                if (!EnsureFolderExists(basePath)) continue;
+
+                var assetPath = $"{basePath}/{type.Name}.json";
+                try
+                {
+                    if (!(Activator.CreateInstance(type) is ISFConfig instance))
+                        continue;
+
+                    instance.Type = type.Name;
+                    instance.Version = ToUnixTime(DateTime.UtcNow);
+
+                    if (instance is ISFNodesConfig nodes && string.IsNullOrEmpty(nodes.Id))
+                    {
+                        nodes.Id = type.Name;
+                    }
+
+                    var json = JsonConvert.SerializeObject(instance, Formatting.Indented);
+                    var relativeInsideAssets = assetPath.StartsWith("Assets/") ? assetPath.Substring(7) : assetPath;
+                    var absolutePath = System.IO.Path.Combine(Application.dataPath, relativeInsideAssets);
+                    System.IO.File.WriteAllText(absolutePath, json);
+                    AssetDatabase.ImportAsset(assetPath);
+
+                    createdConfig = instance;
+                    createdPath = assetPath;
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    SFDebug.Log(LogType.Error, $"Failed to create default config for {type.Name} at {basePath}: {ex}");
+                }
+            }
+
+            return false;
+        }
+
+        private static bool EnsureFolderExists(string folderPath)
+        {
+            if (string.IsNullOrEmpty(folderPath)) return false;
+            folderPath = folderPath.Replace('\\', '/').Trim('/');
+
+            if (AssetDatabase.IsValidFolder(folderPath))
+                return true;
+
+            var parts = folderPath.Split('/');
+            if (parts.Length == 0)
+                return false;
+
+            if (!string.Equals(parts[0], "Assets", StringComparison.Ordinal))
+            {
+                SFDebug.Log(LogType.Error, $"Configs path must be under 'Assets': {folderPath}");
+                return false;
+            }
+
+            var current = parts[0]; // Assets
+            for (int i = 1; i < parts.Length; i++)
+            {
+                var next = parts[i];
+                var combined = $"{current}/{next}";
+                if (!AssetDatabase.IsValidFolder(combined))
+                {
+                    AssetDatabase.CreateFolder(current, next);
+                }
+                current = combined;
+            }
+
+            return AssetDatabase.IsValidFolder(folderPath);
         }
 
         public static void FormatConfigs(bool indentJson)
