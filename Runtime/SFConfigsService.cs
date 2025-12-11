@@ -16,10 +16,11 @@ namespace SFramework.Configs.Runtime
 
         public UniTask Init(CancellationToken cancellationToken)
         {
+            var textAssets = Resources.LoadAll<TextAsset>(string.Empty);
+            
             foreach (var type in GetInheritedClasses())
             {
-                var textAssets = Resources.LoadAll<TextAsset>(string.Empty);
-
+                
                 foreach (var textAsset in textAssets)
                 {
                     var text = Regex.Replace(textAsset.text, "(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", "$1");

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -32,7 +32,6 @@ namespace SFramework.Configs.Editor
 
             _isInitialized = true;
             RefreshConfigs();
-            Debug.Log("SFConfigs Editor Initialized");
             EditorApplication.update -= EnsureInitialized;
         }
 
@@ -81,10 +80,16 @@ namespace SFramework.Configs.Editor
                 list.Add((path, text));
             }
             
-            var configTypes = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a => a.GetTypes())
-                .Where(t => !t.IsAbstract && t.IsClass && typeof(ISFConfig).IsAssignableFrom(t));
-            int total = configTypes.Count();
+            var configTypes = new List<Type>();
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                foreach (var t in assembly.GetTypes())
+                {
+                    if (!t.IsAbstract && t.IsClass && typeof(ISFConfig).IsAssignableFrom(t))
+                        configTypes.Add(t);
+                }
+            }
+            int total = configTypes.Count;
             int index = 0;
             bool createdAny = false;
             foreach (var type in configTypes)
@@ -146,48 +151,53 @@ namespace SFramework.Configs.Editor
 
         static Dictionary<int, string[]> BuildPathsByIndentLevel(string[] paths)
         {
-            var result = new Dictionary<int, List<string>>();
-            
-            result[0] = new List<string> { "-" };
+            var resultSets = new Dictionary<int, HashSet<string>>();
+            resultSets[0] = new HashSet<string> { "-" };
+            var sb = new StringBuilder(64);
 
             foreach (var path in paths)
             {
-                string[] parts = path.Split('/');
+                var parts = path.Split('/');
+                sb.Clear();
                 for (int i = 0; i < parts.Length; i++)
                 {
-                    string partialPath = string.Join("/", parts.Take(i + 1));
+                    if (i > 0) sb.Append('/');
+                    sb.Append(parts[i]);
+                    var partialPath = sb.ToString();
 
-                    if (!result.ContainsKey(i))
+                    if (!resultSets.TryGetValue(i, out var set))
                     {
-                        result[i] = new List<string> { "-" };
+                        set = new HashSet<string> { "-" };
+                        resultSets[i] = set;
                     }
-
-                    if (!result[i].Contains(partialPath))
-                    {
-                        result[i].Add(partialPath);
-                    }
+                    set.Add(partialPath);
                 }
             }
-            
-            return result.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToArray());
+
+            var result = new Dictionary<int, string[]>(resultSets.Count);
+            foreach (var kvp in resultSets)
+            {
+                var arr = new string[kvp.Value.Count];
+                kvp.Value.CopyTo(arr);
+                result[kvp.Key] = arr;
+            }
+            return result;
         }
 
         public static string[] GetNodePaths(string typeName, int indentLevel)
         {
-            if (_nodePathsByType.TryGetValue(typeName, out var d))
-            {
-                if (indentLevel == -1)
-                {
-                    indentLevel = d.Keys.Last();
-                }
+            if (!_nodePathsByType.TryGetValue(typeName, out var d))
+                return null;
 
-                if (d.TryGetValue(indentLevel, out var result))
-                {
-                    return result;
-                }
+            if (indentLevel == -1)
+            {
+                int maxLevel = -1;
+                foreach (var key in d.Keys)
+                    if (key > maxLevel) maxLevel = key;
+                indentLevel = maxLevel;
             }
 
-            return null;
+            return d.TryGetValue(indentLevel, out var result) ? result : null;
         }
 
         private static bool TryCreateDefaultConfig(Type type, SFConfigsSettings settings, out ISFConfig createdConfig, out string createdPath)
@@ -348,13 +358,11 @@ namespace SFramework.Configs.Editor
                     return configs;
                 }
 
-                var regex = new Regex("(\"(?:[^\"\\\\]|\\\\.)*\")|\\s+", RegexOptions.Compiled);
-
                 foreach (var assetsGuid in assetsGuids)
                 {
                     var path = AssetDatabase.GUIDToAssetPath(assetsGuid);
                     var text = AssetDatabase.LoadAssetAtPath<TextAsset>(path).text;
-                    text = regex.Replace(text, "$1");
+                    text = _jsonWhitespaceRegex.Replace(text, "$1");
                     if (text.StartsWith($"{{\"Type\":\"{type.Name}\"") || text.EndsWith($"\"Type\":\"{type.Name}\"}}"))
                     {
                         var repository = JsonConvert.DeserializeObject(text, type) as ISFConfig;
@@ -367,98 +375,56 @@ namespace SFramework.Configs.Editor
             return configs;
         }
 
-        private static HashSet<ISFConfig> FindConfigs(Type type)
+        private static ICollection<ISFConfig> FindConfigs(Type type)
         {
-            var configs = new HashSet<ISFConfig>();
-
-            if (!_configsByType.TryGetValue(type, out var _configs)) return configs;
-            foreach (var (config, _) in _configs)
-            {
-                configs.Add(config);
-            }
-
-            return configs;
+            return _configsByType.TryGetValue(type, out var configs) ? configs.Keys : Array.Empty<ISFConfig>();
         }
 
-        public static Dictionary<ISFConfig, string> FindConfigsWithPaths(Type type)
+        public static IReadOnlyDictionary<ISFConfig, string> FindConfigsWithPaths(Type type)
         {
-            var configs = new Dictionary<ISFConfig, string>();
-
-            if (!_configsByType.TryGetValue(type, out var _configs)) return configs;
-
-            foreach (var (config, path) in _configs)
-            {
-                configs.Add(config, path);
-            }
-
-            return configs;
+            return _configsByType.TryGetValue(type, out var configs) ? configs : EmptyConfigDict;
         }
+
+        private static readonly Dictionary<ISFConfig, string> EmptyConfigDict = new();
 
         private static void FindAllPaths(this ISFConfigNode[] nodes, out List<string> paths)
         {
             var ids = new HashSet<string>();
-            paths = new List<string>();
+            var sb = new StringBuilder(64);
 
             foreach (var root in nodes)
             {
-                var childPaths = GetChildPaths(root, "");
-
-                if (childPaths == null) continue;
-
-                foreach (var path in childPaths)
-                {
-                    ids.Add(path);
-                }
+                GetChildPathsOptimized(root, sb, ids);
             }
 
-
+            paths = new List<string>(ids.Count);
             foreach (var id in ids)
             {
-                var split = id.Split("/");
-                var path = string.Empty;
-                var childLevel = split.Length;
-
-                for (var i = 0; i < childLevel; i++)
-                {
-                    path += split[i];
-                    if (i < childLevel - 1)
-                    {
-                        path += "/";
-                    }
-                }
-
-                if (string.IsNullOrWhiteSpace(path)) continue;
-
-                paths.Add(path);
+                if (!string.IsNullOrEmpty(id))
+                    paths.Add(id);
             }
         }
 
-        private static List<string> GetChildPaths(ISFConfigNode node, string path)
+        private static void GetChildPathsOptimized(ISFConfigNode node, StringBuilder sb, HashSet<string> results)
         {
-            var paths = new List<string>();
+            int startLen = sb.Length;
+            sb.Append(node.Id);
 
-            path += node.Id;
-
-            if (node.Children == null)
+            if (node.Children == null || node.Children.Length == 0)
             {
-                paths.Add(path);
-                return paths;
+                results.Add(sb.ToString());
+            }
+            else
+            {
+                foreach (var child in node.Children)
+                {
+                    sb.Append('/');
+                    GetChildPathsOptimized(child, sb, results);
+                    sb.Length = startLen + node.Id.Length;
+                }
             }
 
-            if (node.Children.Length == 0)
-            {
-                paths.Add(path);
-                return paths;
-            }
-
-            foreach (var child in node.Children)
-            {
-                var childPaths = GetChildPaths(child, path + "/");
-                if (childPaths == null) continue;
-                paths.AddRange(childPaths);
-            }
-
-            return paths;
+            sb.Length = startLen;
         }
     }
 }
