@@ -2,8 +2,6 @@
 
 # SF Configs
 
-[Documentation website](https://docs.secretplace.studio/#sf-configs)
-
 JSON configuration types, a Resources loader, and Inspector selectors for SFramework projects. Define global settings or a tree of nodes in C#, store their values in JSON, and query loaded configurations by their concrete type.
 
 Package: `sp.sframework.configs` · Version: `1.0.0` · [MIT license](LICENSE.md)
